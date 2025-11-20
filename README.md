@@ -9,7 +9,7 @@ This repository contains the source code for the Password Manager API, a project
 This board tracks the current development progress.
 
 ### In Progress
-- [ ] Architecture Diagram
+- [x] Architecture Diagram
 - [ ] Entity Relationship Diagram (ERD)
 - [ ] Class Diagram
 
