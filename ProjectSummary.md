@@ -1,6 +1,4 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
-
-# We decided to build the app in C\#. It will be a password manager app. I attached a use case document that we quickly put together and also an image containing some nice to haves if we need more complexity. I need you to make a brief document summarizing the project so I can reference it and know all the features that will or might be there and also those that will not be there. I do not want to over complicate the project.
+# Password Manager API - Project Summary
 
 The document should contain:
 
@@ -8,11 +6,7 @@ The document should contain:
 - technologies used (C\#, database, swagger...)
 - Must haves, nice to haves, will not haves
 
-Based on your use case document and the attached image, here's a concise project summary document:
-
 ***
-
-# Password Manager API - Project Summary
 
 ## Project Description
 
@@ -161,17 +155,3 @@ A successful implementation includes:
 5. Working API with Swagger documentation
 6. PostgreSQL database with proper relationships
 7. Basic audit logging for security
-
-The project should prioritize security, clean API design, and a solid foundation that could be extended with "nice to have" features if time permits.
-
-***
-
-Let me know if you'd like me to adjust the scope or add/remove anything from this summary!
-<span style="display:none">[^1][^2]</span>
-
-<div align="center">⁂</div>
-
-[^1]: image.jpg
-
-[^2]: PasswordManagerUseCaseDocument.docx
-
