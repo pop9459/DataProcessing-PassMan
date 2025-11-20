@@ -1,9 +1,41 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0" version="29.1.0">
   <diagram name="Page-1" id="WeSDmph76QnM_6JTpEOe">
-    <mxGraphModel dx="1213" dy="837" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="2063" dy="837" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-8" edge="1" parent="1" source="hqhO9-PTzxbRjHVeclt6-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hqhO9-PTzxbRjHVeclt6-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-10" connectable="0" parent="hqhO9-PTzxbRjHVeclt6-8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=14;" value="&lt;font face=&quot;Courier New&quot;&gt;HTTP requests&lt;/font&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.1298" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-1" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#232F3D;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.client;fontFamily=Courier New;" value="&lt;div&gt;Client&lt;/div&gt;" vertex="1">
+          <mxGeometry height="76" width="78" x="-120" y="358" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=#e1d5e7;strokeColor=#9673a6;" value="&lt;h1&gt;&lt;br&gt;&lt;/h1&gt;" vertex="1">
+          <mxGeometry height="712" width="250" x="140" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font face=&quot;Courier New&quot; style=&quot;font-size: 22px;&quot;&gt;Presentation layer&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="250" x="140" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;font face=&quot;Courier New&quot;&gt;AuthController&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="210" x="160" y="206" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;font face=&quot;Courier New&quot;&gt;VaultController&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="210" x="160" y="286" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;font face=&quot;Courier New&quot;&gt;CredentialsController&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="210" x="160" y="366" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;font face=&quot;Courier New&quot;&gt;ShareController&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="210" x="160" y="446" as="geometry" />
+        </mxCell>
+        <mxCell id="hqhO9-PTzxbRjHVeclt6-15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;font face=&quot;Courier New&quot;&gt;AuditController&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="210" x="160" y="526" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
