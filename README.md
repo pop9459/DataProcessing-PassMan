@@ -9,12 +9,17 @@ This repository contains the source code for the Password Manager API, a project
 This board tracks the current development progress.
 
 ### In Progress
+
+#### Documentation
 - [x] Architecture Diagram
 - [ ] Entity Relationship Diagram (ERD)
 - [ ] Class Diagram
 
-### Upcoming
+#### Infrastructure
 - [ ] Setup ASP.NET Core Web API project structure
+- [ ] Setup a Dockerfile for the API host
+
+### Upcoming
 - [ ] Configure PostgreSQL database with Entity Framework Core
 - [ ] Implement basic user registration and JWT authentication
 - [ ] Setup Swagger/OpenAPI for API documentation
