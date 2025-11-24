@@ -60,3 +60,11 @@ This board tracks the current development progress.
 - [ ] Configure PostgreSQL database with Entity Framework Core
 - [ ] Implement basic user registration and JWT authentication
 - [ ] Setup Swagger/OpenAPI for API documentation
+
+## API Documentation
+
+To access the Swagger documentation for the API, run the application and navigate to `/swagger` in your browser.
+
+- **URL**: `http://localhost:5246/swagger`
+
+This will display the Swagger UI, which provides detailed information about the available endpoints, models, and allows you to interact with the API directly.
