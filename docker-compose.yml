@@ -1,0 +1,7 @@
+services:
+  passman-api:
+    build: ./PassManAPI
+    ports:
+      - "5246:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
