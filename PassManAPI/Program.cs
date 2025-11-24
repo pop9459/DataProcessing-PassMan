@@ -9,12 +9,14 @@ public class Program
         // Add services to the container.
         builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
+        builder.Services.AddSwaggerGen();
         var app = builder.Build();
 
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
+            app.UseSwagger();
+            app.UseSwaggerUI();
         }
 
         // Root endpoint - display welcome message
