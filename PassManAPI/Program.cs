@@ -22,7 +22,9 @@ app.MapGet("/", () =>
     "|_|   \\__,_|___/___/_|  |_|\\__,_|_| |_| /_/   \\_\\_|  |___|\n" +
     "\n"+
     "Welcome to PassManAPI!\n" +
-    "Visit https://github.com/pop9459/DataProcessing-PassMan for more information.\n"
+    "Visit https://github.com/pop9459/DataProcessing-PassMan for more information.\n" + 
+    "\n" +
+    $"Running in: {app.Environment.EnvironmentName} environment"
 );
 
 app.Run();
