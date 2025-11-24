@@ -53,13 +53,13 @@ This board tracks the current development progress.
 - [ ] Class Diagram
 
 #### Infrastructure
-- [ ] Setup ASP.NET Core Web API project structure
+- [x] Setup ASP.NET Core Web API project structure
 - [x] Setup a Dockerfile for the API host
+- [x] Setup Swagger/OpenAPI for API documentation
 
 ### Upcoming
 - [ ] Configure PostgreSQL database with Entity Framework Core
 - [ ] Implement basic user registration and JWT authentication
-- [ ] Setup Swagger/OpenAPI for API documentation
 
 ## API Documentation
 
