@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "OGErRIJo4b2TsFkoMq0HjzEgEYSwcWRkfOX2dKV+yuw=",
+  "Source": "PassManAPI",
+  "BasePath": "_content/PassManAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
