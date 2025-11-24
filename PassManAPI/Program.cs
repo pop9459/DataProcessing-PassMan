@@ -7,11 +7,9 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-        builder.Services.AddOpenApi();
-
+        builder.Services.AddControllers();          // Register MVC controllers
+        builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         var app = builder.Build();
-
 
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
@@ -32,6 +30,10 @@ public class Program
             "\n" +
             $"Running in: {app.Environment.EnvironmentName} environment"
         );
+
+
+        // Map controller routes defined in the Controllers folder
+        app.MapControllers();
 
         app.Run();
     }
