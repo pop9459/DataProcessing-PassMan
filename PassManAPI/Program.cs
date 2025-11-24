@@ -9,7 +9,11 @@ public class Program
         // Add services to the container.
         builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(options =>
+        {
+            var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            options.IncludeXmlComments(System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename));
+        });
         var app = builder.Build();
 
         // Enable swagger UI in development environment
