@@ -5,10 +5,6 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PassManAPI", "PassManAPI\PassManAPI.csproj", "{F203368F-48CE-D095-617F-29EAC7B32634}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PassManGUI", "PassManGUI", "{CEFB51B5-2B23-82F6-5266-F6CE556CC294}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PassManGUI", "PassManGUI\PassManGUI\PassManGUI.csproj", "{3900FDF7-5267-49A6-A10D-DD02133B5585}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,23 +27,9 @@ Global
 		{F203368F-48CE-D095-617F-29EAC7B32634}.Release|x64.Build.0 = Release|Any CPU
 		{F203368F-48CE-D095-617F-29EAC7B32634}.Release|x86.ActiveCfg = Release|Any CPU
 		{F203368F-48CE-D095-617F-29EAC7B32634}.Release|x86.Build.0 = Release|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|x64.Build.0 = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Debug|x86.Build.0 = Debug|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Release|x64.ActiveCfg = Release|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Release|x64.Build.0 = Release|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Release|x86.ActiveCfg = Release|Any CPU
-		{3900FDF7-5267-49A6-A10D-DD02133B5585}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{3900FDF7-5267-49A6-A10D-DD02133B5585} = {CEFB51B5-2B23-82F6-5266-F6CE556CC294}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9DE2A08A-99A8-412D-9831-B828574A692D}
