@@ -41,6 +41,21 @@ This repository contains the source code for the Password Manager API, a project
     ``` 
 6. Open http://localhost:5246/
 
+## Accessing the database manually
+
+1. Install [MySQL Workbench](https://dev.mysql.com/downloads/workbench/)
+
+2. Open the database menu
+
+<kbd>Ctrl</kbd>+<kbd>J</kbd>
+
+3. Enter the details
+
+-Host: localhost
+-Port: 3306
+-User: root
+-Password: hihi         (intentional leak hihihiha)
+
 ## Project Status
 
 This board tracks the current development progress.
