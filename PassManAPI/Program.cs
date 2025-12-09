@@ -1,5 +1,7 @@
 namespace PassManAPI;
 
+using PassManAPI.Components;
+
 public class Program
 {
     public static async Task Main(string[] args)
@@ -7,6 +9,8 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents(); // Blazor components
         builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
@@ -14,6 +18,7 @@ public class Program
             var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
             options.IncludeXmlComments(System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename));
         });
+
         var app = builder.Build();
 
         // Call DB to test the connectivity
@@ -31,27 +36,24 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        // Root endpoint - display welcome message
-        app.MapGet("/", () =>
-            " _______                               __       __                               ______   _______   ______\n" + 
-            "/       \\                             /  \\     /  |                             /      \\ /       \\ /      |\n" +
-            "$$$$$$$  | ______    _______  _______ $$  \\   /$$ |  ______   _______          /$$$$$$  |$$$$$$$  |$$$$$$/\n" +
-            "$$ |__$$ |/      \\  /       |/       |$$$  \\ /$$$ | /      \\ /       \\         $$ |__$$ |$$ |__$$ |  $$ |\n" +
-            "$$    $$/ $$$$$$  |/$$$$$$$//$$$$$$$/ $$$$  /$$$$ | $$$$$$  |$$$$$$$  |        $$    $$ |$$    $$/   $$ |\n" +
-            "$$$$$$$/  /    $$ |$$      \\$$      \\ $$ $$ $$/$$ | /    $$ |$$ |  $$ |        $$$$$$$$ |$$$$$$$/    $$ |\n" +
-            "$$ |     /$$$$$$$ | $$$$$$  |$$$$$$  |$$ |$$$/ $$ |/$$$$$$$ |$$ |  $$ |        $$ |  $$ |$$ |       _$$ |_ \n" +
-            "$$ |     $$    $$ |/     $$//     $$/ $$ | $/  $$ |$$    $$ |$$ |  $$ |        $$ |  $$ |$$ |      / $$   |\n" +
-            "$$/       $$$$$$$/ $$$$$$$/ $$$$$$$/  $$/      $$/  $$$$$$$/ $$/   $$/         $$/   $$/ $$/       $$$$$$/ \n" +
-            "\n"+
-            "Welcome to PassManAPI!\n" +
-            "Visit https://github.com/pop9459/DataProcessing-PassMan for more information.\n" + 
-            "\n" +
-            $"Running in: {app.Environment.EnvironmentName} environment"
-        );
+        // Configure the HTTP request pipeline.
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error", createScopeForErrors: true);
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
+        }
+        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+        app.UseHttpsRedirection();
 
+        app.UseAntiforgery();
 
-        // Map controller routes defined in the Controllers folder
+        // Map controller routes BEFORE Blazor to prioritize API endpoints
         app.MapControllers();
+
+        app.MapStaticAssets();
+        app.MapRazorComponents<App>()
+            .AddInteractiveServerRenderMode();
 
         app.Run();
     }
