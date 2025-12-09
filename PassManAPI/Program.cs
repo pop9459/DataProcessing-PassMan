@@ -30,7 +30,7 @@ public class Program
         {
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
-            await PassManAPI.Controllers.SqlTest.RunAsync(conn);
+            await SqlTest.RunAsync(conn);
         }
 
         // Enable swagger UI in development environment
