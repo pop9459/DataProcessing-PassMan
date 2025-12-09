@@ -1,0 +1,173 @@
+@page "/vaults"
+@rendermode InteractiveServer
+
+@* 
+    Vaults Page - Displays all user's vaults
+    
+    TODO:
+    1. Add authentication check
+       - Redirect to /login if not authenticated
+       - Get current user from auth service
+    
+    2. Load user's vaults from API
+       - Call GET /api/vaults endpoint
+       - Display loading state while fetching
+       - Handle empty state (no vaults)
+    
+    3. Implement vault actions
+       - Create new vault (modal/page)
+       - Edit vault (navigate to vault detail)
+       - Delete vault (confirmation dialog)
+       - Share vault (modal)
+    
+    4. Add search/filter functionality
+       - Search vaults by name
+       - Filter by date, items count
+       - Sort options
+    
+    5. Add user profile section
+       - Display user email/name
+       - Logout button
+       - Settings link
+*@
+
+<PageTitle>My Vaults - PassMan</PageTitle>
+
+<div class="page-grid">
+    <div class="page-content">
+        <div class="vaults-container">
+            <div class="vaults-header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>My Vaults</h1>
+                        <p>Manage your secure credential vaults</p>
+                    </div>
+                    <div class="header-right">
+                        @* TODO: Add user menu dropdown *@
+                        <button class="btn-secondary">Settings</button>
+                        <button class="btn-primary" @onclick="CreateVault">+ New Vault</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="vaults-content">
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading your vaults...</p>
+                    </div>
+                }
+                else if (vaults.Count == 0)
+                {
+                    <div class="empty-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <h2>No vaults yet</h2>
+                        <p>Create your first vault to start storing your passwords securely.</p>
+                        <button class="btn-primary" @onclick="CreateVault">Create Your First Vault</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="vaults-grid">
+                        @foreach (var vault in vaults)
+                        {
+                            <VaultCard 
+                                Name="@vault.Name"
+                                Description="@vault.Description"
+                                ItemCount="@vault.ItemCount"
+                                LastModified="@vault.LastModified"
+                                OnClick="() => OpenVault(vault.Id)" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isLoading = true;
+    private List<VaultModel> vaults = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Simulate loading
+        await Task.Delay(1000);
+        
+        // TODO: Replace with actual API call
+        // Example: vaults = await VaultService.GetUserVaultsAsync();
+        
+        // Mock data for demonstration
+        vaults = new List<VaultModel>
+        {
+            new VaultModel 
+            { 
+                Id = 1, 
+                Name = "Personal", 
+                Description = "Personal accounts and passwords",
+                ItemCount = 24,
+                LastModified = "11 months ago"
+            },
+            new VaultModel 
+            { 
+                Id = 2, 
+                Name = "Work", 
+                Description = "Work-related credentials",
+                ItemCount = 12,
+                LastModified = "2 days ago"
+            },
+            new VaultModel 
+            { 
+                Id = 3, 
+                Name = "Family", 
+                Description = "Shared family accounts",
+                ItemCount = 8,
+                LastModified = "1 week ago"
+            },
+            new VaultModel 
+            { 
+                Id = 4, 
+                Name = "Social Media", 
+                Description = "Social network logins and credentials",
+                ItemCount = 15,
+                LastModified = "3 days ago"
+            },
+            new VaultModel 
+            { 
+                Id = 5, 
+                Name = "Financial", 
+                Description = "Banking and payment service accounts",
+                ItemCount = 9,
+                LastModified = "1 month ago"
+            }
+        };
+        
+        isLoading = false;
+    }
+    
+    private void CreateVault()
+    {
+        // TODO: Open create vault modal or navigate to create page
+        Console.WriteLine("Create vault clicked");
+    }
+    
+    private void OpenVault(int vaultId)
+    {
+        // TODO: Navigate to vault detail page
+        Console.WriteLine($"Open vault {vaultId}");
+    }
+    
+    // Temporary model - should be moved to Models folder
+    private class VaultModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int ItemCount { get; set; }
+        public string LastModified { get; set; } = "";
+    }
+}
