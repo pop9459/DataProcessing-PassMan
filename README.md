@@ -56,6 +56,42 @@ This repository contains the source code for the Password Manager API, a project
 -User: root
 -Password: hihi         (intentional leak hihihiha)
 
+## Project Structure
+
+The project follows the standard ASP.NET Core Web API structure:
+
+```
+PassManAPI/
+├── Components/             # Blazor components for UI
+│   ├── Layout/             # Layout components (MainLayout, NavMenu)
+│   └── Pages/              # Page components (Home, Login, Register, Vaults)
+├── Controllers/            # Presentation layer (namespace: PassManAPI.Controllers)
+│   ├── AuditController.cs
+│   ├── AuthController.cs
+│   ├── # API endpoint controllers
+│   └── ...
+├── Helpers/                # Helper/utility classes (namespace: PassManAPI.Helpers)
+│   ├── SqlTest.cs
+│   └── ...
+├── Managers/               # Business layer (namespace PassManAPI.Managers) 
+│   ├── # Logic core classes
+│   └── ...
+├── Models/                 # Data acess layers (namespace: PassManAPI.Models)
+│   ├── # ORM definitions, DB connects...
+│   └── ...
+├── Properties/             # Project properties and launch settings
+├── wwwroot/                # Static files (CSS, JS, images)
+├── Program.cs              # Application entry point
+├── appsettings.json        # Configuration settings
+└── PassManAPI.csproj       # Project file
+```
+
+### Namespace Conventions
+- **Controllers**: `PassManAPI.Controllers`
+- **Models**: `PassManAPI.Models`
+- **Helpers**: `PassManAPI.Helpers`
+- **Components**: `PassManAPI.Components`
+
 ## Project Status
 
 This board tracks the current development progress.
