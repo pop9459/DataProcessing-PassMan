@@ -1,5 +1,9 @@
 namespace PassManAPI;
 
+using PassManAPI.Models;
+using PassManAPI.Controllers;
+using PassManAPI.Helpers;
+using PassManAPI.Managers;
 using PassManAPI.Components;
 
 public class Program
