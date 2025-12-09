@@ -73,7 +73,7 @@ PassManAPI/
 ├── Helpers/                # Helper/utility classes (namespace: PassManAPI.Helpers)
 │   ├── SqlTest.cs
 │   └── ...
-├── Managers/               # Business layer (namespace PassManAPI.Managers) 
+├── Managers/               # Business layer (namespace: PassManAPI.Managers) 
 │   ├── # Logic core classes
 │   └── ...
 ├── Models/                 # Data acess layers (namespace: PassManAPI.Models)
