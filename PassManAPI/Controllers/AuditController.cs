@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace PassManAPI;
+namespace PassManAPI.Controllers;
 
 [ApiController]
 [Route("api/audit")]

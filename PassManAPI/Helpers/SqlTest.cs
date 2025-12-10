@@ -2,7 +2,7 @@ using MySqlConnector;
 using System;
 using System.Threading.Tasks;
 
-namespace PassManAPI.Controllers
+namespace PassManAPI.Helpers
 {
     public static class SqlTest
     {
