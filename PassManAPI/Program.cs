@@ -2,6 +2,11 @@ namespace PassManAPI;
 
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
+using PassManAPI.Models;
+using PassManAPI.Controllers;
+using PassManAPI.Helpers;
+using PassManAPI.Managers;
+using PassManAPI.Components;
 
 public class Program
 {
@@ -10,7 +15,9 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        builder.Services.AddControllers(); // Register MVC controllers
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents(); // Blazor components
+        builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
         {
@@ -55,64 +62,37 @@ public class Program
 
         if (app.Environment.IsDevelopment())
         {
-            // Enable swagger UI
-            app.UseSwagger();
-            app.UseSwaggerUI();
-
             // Call DB to test the connectivity
-            var conn =
-                builder.Configuration.GetConnectionString("DefaultConnection")
-                ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
-            await PassManAPI.Controllers.SqlTest.RunAsync(conn);
+            var conn = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
+            await SqlTest.RunAsync(conn);
         }
 
-        // Root endpoint - display welcome message
-        app.MapGet(
-            "/",
-            () =>
-                " _______                               __       __                               ______   _______   ______\n"
-                + "/       \\                             /  \\     /  |                             /      \\ /       \\ /      |\n"
-                + "$$$$$$$  | ______    _______  _______ $$  \\   /$$ |  ______   _______          /$$$$$$  |$$$$$$$  |$$$$$$/\n"
-                + "$$ |__$$ |/      \\  /       |/       |$$$  \\ /$$$ | /      \\ /       \\         $$ |__$$ |$$ |__$$ |  $$ |\n"
-                + "$$    $$/ $$$$$$  |/$$$$$$$//$$$$$$$/ $$$$  /$$$$ | $$$$$$  |$$$$$$$  |        $$    $$ |$$    $$/   $$ |\n"
-                + "$$$$$$$/  /    $$ |$$      \\$$      \\ $$ $$ $$/$$ | /    $$ |$$ |  $$ |        $$$$$$$$ |$$$$$$$/    $$ |\n"
-                + "$$ |     /$$$$$$$ | $$$$$$  |$$$$$$  |$$ |$$$/ $$ |/$$$$$$$ |$$ |  $$ |        $$ |  $$ |$$ |       _$$ |_ \n"
-                + "$$ |     $$    $$ |/     $$//     $$/ $$ | $/  $$ |$$    $$ |$$ |  $$ |        $$ |  $$ |$$ |      / $$   |\n"
-                + "$$/       $$$$$$$/ $$$$$$$/ $$$$$$$/  $$/      $$/  $$$$$$$/ $$/   $$/         $$/   $$/ $$/       $$$$$$/ \n"
-                + "\n"
-                + "Welcome to PassManAPI!\n"
-                + "Visit https://github.com/pop9459/DataProcessing-PassMan for more information.\n"
-                + "\n"
-                + $"Running in: {app.Environment.EnvironmentName} environment"
-        );
+        // Enable swagger UI in development environment
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
 
-        // Test endpoint to verify EF Core setup
-        app.MapGet(
-            "/test-ef",
-            async (ApplicationDbContext dbContext) =>
-            {
-                try
-                {
-                    var canConnect = await dbContext.Database.CanConnectAsync();
-                    return Results.Ok(
-                        new
-                        {
-                            success = true,
-                            message = "EF Core connection successful",
-                            canConnect,
-                            environment = app.Environment.EnvironmentName,
-                        }
-                    );
-                }
-                catch (Exception ex)
-                {
-                    return Results.Problem($"EF Core connection failed: {ex.Message}");
-                }
-            }
-        );
+        // Configure the HTTP request pipeline.
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error", createScopeForErrors: true);
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
+        }
+        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+        app.UseHttpsRedirection();
 
-        // Map controller routes defined in the Controllers folder
+        app.UseAntiforgery();
+
+        // Map controller routes BEFORE Blazor to prioritize API endpoints
         app.MapControllers();
+
+        app.MapStaticAssets();
+        app.MapRazorComponents<App>()
+            .AddInteractiveServerRenderMode();
 
         app.Run();
     }
