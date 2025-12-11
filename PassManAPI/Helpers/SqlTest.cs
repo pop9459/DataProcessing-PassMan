@@ -11,8 +11,6 @@ namespace PassManAPI.Helpers
             try
             {
                 await using var connection = new MySqlConnection(connectionString);
-                Console.WriteLine("\nQuery data example:");
-                Console.WriteLine("=========================================\n");
 
                 await connection.OpenAsync();
 
@@ -25,7 +23,7 @@ namespace PassManAPI.Helpers
                     Console.WriteLine(reader.GetInt32(0));
                 }
 
-                Console.WriteLine("DB test succeeded.");
+                Console.WriteLine(" DB test succeeded.");
             }
             catch (Exception e)
             {
