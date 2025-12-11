@@ -1,5 +1,6 @@
 namespace PassManAPI;
 
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
@@ -36,6 +37,30 @@ public class Program
             )
         );
 
+        // Add Identity services
+        builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
+        {
+            // Password settings
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+
+            // Lockout settings
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.AllowedForNewUsers = true;
+
+            // User settings
+            options.User.RequireUniqueEmail = true;
+
+            // Sign-in settings
+            options.SignIn.RequireConfirmedEmail = true;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+
         var app = builder.Build();
 
         using (var scope = app.Services.CreateScope())
@@ -56,7 +81,7 @@ public class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Database connection test via EF Core failed", ex.Message);
+                Console.WriteLine($"Database connection test via EF Core failed: {ex.Message}");
             }
         }
 
@@ -84,6 +109,10 @@ public class Program
         }
         app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
         app.UseHttpsRedirection();
+
+        // Authentication & Authorization middleware
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         app.UseAntiforgery();
 
