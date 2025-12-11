@@ -101,6 +101,22 @@
     </div>
 </div>
 
+<!-- Item Detail Panel (outside page-grid for fixed positioning) -->
+<ItemDetailPanel 
+    IsOpen="isPanelOpen"
+    ItemName="@selectedItemName"
+    ItemUsername="@selectedItemUsername"
+    ItemPassword="@selectedItemPassword"
+    ItemUrl="@selectedItemUrl"
+    ItemLabel="@selectedItemLabel"
+    ItemNotes="@selectedItemNotes"
+    ItemTags="@selectedItemTags"
+    ItemCreatedAt="@selectedItemCreatedAt"
+    ItemUpdatedAt="@selectedItemUpdatedAt"
+    OnClose="ClosePanel"
+    OnEdit="EditItem"
+    OnDelete="DeleteItem" />
+
 @code {
     [Parameter]
     public int VaultId { get; set; }
@@ -108,6 +124,19 @@
     private string vaultName = "";
     private string vaultDescription = "";
     private List<VaultItemModel> items = new();
+    
+    // Panel state
+    private bool isPanelOpen = false;
+    private int selectedItemId = 0;
+    private string selectedItemName = "";
+    private string selectedItemUsername = "";
+    private string selectedItemPassword = "";
+    private string selectedItemUrl = "";
+    private string selectedItemLabel = "";
+    private string selectedItemNotes = "";
+    private string selectedItemTags = "";
+    private string selectedItemCreatedAt = "";
+    private string selectedItemUpdatedAt = "";
     
     protected override Task OnInitializedAsync()
     {
@@ -136,8 +165,115 @@
     
     private void OpenItem(int itemId)
     {
-        // TODO: Open item detail modal or navigate to edit page
-        Console.WriteLine($"Open item {itemId}");
+        // Load item details and open panel
+        selectedItemId = itemId;
+        LoadItemDetails(itemId);
+        isPanelOpen = true;
+    }
+    
+    private void LoadItemDetails(int itemId)
+    {
+        // TODO: Replace with actual API call to get full item details
+        // For now, use mock data based on itemId
+        
+        selectedItemName = itemId switch
+        {
+            1 => "Gmail Account",
+            2 => "GitHub",
+            3 => "Netflix",
+            4 => "Office 365",
+            5 => "Slack",
+            _ => "Unknown Item"
+        };
+        
+        selectedItemUsername = itemId switch
+        {
+            1 => "john.doe@gmail.com",
+            2 => "johndoe",
+            3 => "john.doe@gmail.com",
+            4 => "john.doe@company.com",
+            5 => "john.doe@company.com",
+            _ => ""
+        };
+        
+        selectedItemPassword = "MySecurePassword123!"; // Mock password
+        
+        selectedItemUrl = itemId switch
+        {
+            1 => "https://mail.google.com",
+            2 => "https://github.com",
+            3 => "https://netflix.com",
+            4 => "https://office.com",
+            5 => "https://slack.com",
+            _ => ""
+        };
+        
+        selectedItemLabel = itemId switch
+        {
+            1 => "Personal",
+            2 => "",
+            3 => "Streaming",
+            4 => "Work",
+            5 => "",
+            _ => ""
+        };
+        
+        selectedItemNotes = itemId switch
+        {
+            1 => "Primary email account for personal use. Enable 2FA for extra security.",
+            2 => "Development account with access to personal repositories.",
+            3 => "Family streaming subscription - shared with household.",
+            4 => "Corporate email and office suite access.",
+            5 => "Company workspace communication tool.",
+            _ => ""
+        };
+        
+        selectedItemTags = itemId switch
+        {
+            1 => "email, google, primary",
+            2 => "development, coding, git",
+            3 => "streaming, entertainment, family",
+            4 => "work, email, office",
+            5 => "work, communication, team",
+            _ => ""
+        };
+        
+        selectedItemCreatedAt = itemId switch
+        {
+            1 => "January 15, 2024",
+            2 => "March 22, 2024",
+            3 => "June 10, 2024",
+            4 => "December 5, 2023",
+            5 => "December 7, 2024",
+            _ => ""
+        };
+        
+        selectedItemUpdatedAt = itemId switch
+        {
+            1 => "November 28, 2024",
+            2 => "April 18, 2024",
+            3 => "September 3, 2024",
+            4 => "December 5, 2023",
+            5 => "December 9, 2024",
+            _ => ""
+        };
+    }
+    
+    private void ClosePanel()
+    {
+        isPanelOpen = false;
+    }
+    
+    private void EditItem()
+    {
+        // TODO: Implement edit functionality
+        Console.WriteLine($"Edit item {selectedItemId}");
+    }
+    
+    private void DeleteItem()
+    {
+        // TODO: Implement delete confirmation and functionality
+        Console.WriteLine($"Delete item {selectedItemId}");
     }
     
 }
