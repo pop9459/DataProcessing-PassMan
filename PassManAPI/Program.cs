@@ -29,6 +29,9 @@ public class Program
             )
         );
 
+        //Add DB Health Service
+        builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
+
         var app = builder.Build();
 
         using (var scope = app.Services.CreateScope())
@@ -84,31 +87,6 @@ public class Program
                 + "Visit https://github.com/pop9459/DataProcessing-PassMan for more information.\n"
                 + "\n"
                 + $"Running in: {app.Environment.EnvironmentName} environment"
-        );
-
-        // Test endpoint to verify EF Core setup
-        app.MapGet(
-            "/test-ef",
-            async (ApplicationDbContext dbContext) =>
-            {
-                try
-                {
-                    var canConnect = await dbContext.Database.CanConnectAsync();
-                    return Results.Ok(
-                        new
-                        {
-                            success = true,
-                            message = "EF Core connection successful",
-                            canConnect,
-                            environment = app.Environment.EnvironmentName,
-                        }
-                    );
-                }
-                catch (Exception ex)
-                {
-                    return Results.Problem($"EF Core connection failed: {ex.Message}");
-                }
-            }
         );
 
         // Map controller routes defined in the Controllers folder
