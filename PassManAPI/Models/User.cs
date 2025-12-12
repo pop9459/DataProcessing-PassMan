@@ -1,30 +1,36 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Identity;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace PassManAPI.Models
 {
-    /// <summary>
-    /// User entity that extends IdentityUser for authentication
-    /// Uses built-in UserName property from IdentityUser for display name
-    /// </summary>
-    public class User : IdentityUser<int>
+    [Index(nameof(Email), IsUnique = true)]
+    [Index(nameof(Username), IsUnique = true)]
+    public class User
     {
-        /// <summary>
-        /// When the user account was created
-        /// </summary>
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        [Key]
+        public int Id { get; set; }
 
-        /// <summary>
-        /// Last time the user logged in
-        /// </summary>
+        [Required]
+        [EmailAddress]
+        [MaxLength(255)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(255)] // BCrypt hash is 60 chars, but leave room
+        public string PasswordHash { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
 
-        /// <summary>
-        /// Encrypted master key for this user's vaults (for future encryption implementation)
-        /// </summary>
-        public string? EncryptedVaultKey { get; set; }
-
-        // Navigation properties (will be added when we create Vault model)
-        // public ICollection<Vault> Vaults { get; set; } = new List<Vault>();
+        // Navigation properties
+        public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
+        public virtual ICollection<VaultShare> SharedVaults { get; set; } = new List<VaultShare>();
+        public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
     }
 }

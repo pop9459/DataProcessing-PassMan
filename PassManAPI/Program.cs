@@ -37,6 +37,8 @@ public class Program
             )
         );
 
+        //Add DB Health Service
+        builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
