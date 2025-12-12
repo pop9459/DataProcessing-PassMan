@@ -1,43 +1,100 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Models;
 
 namespace PassManAPI.Data
 {
-    /// <summary>
-    /// Application database context with Identity integration
-    /// </summary>
-    public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<int>, int>
+    public class ApplicationDbContext : DbContext
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
 
-        // DbSets for our custom entities (will add as we create models)
-        // public DbSet<Vault> Vaults { get; set; }
-        // public DbSet<VaultItem> VaultItems { get; set; }
-        // public DbSet<VaultShare> VaultShares { get; set; }
-        // public DbSet<AuditLog> AuditLogs { get; set; }
+        // Core DbSets
+        public DbSet<User> Users { get; set; }
+        public DbSet<Vault> Vaults { get; set; }
+        public DbSet<Credential> Credentials { get; set; }
+        public DbSet<Category> Categories { get; set; }
+        public DbSet<VaultShare> VaultShares { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configure User entity
-            modelBuilder.Entity<User>(entity =>
-            {
-                entity.Property(u => u.CreatedAt)
-                    .IsRequired();
-            });
+            // User configurations
+            modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
-            // Customize Identity table names (optional - makes tables cleaner)
-            modelBuilder.Entity<User>().ToTable("Users");
-            modelBuilder.Entity<IdentityRole<int>>().ToTable("Roles");
-            modelBuilder.Entity<IdentityUserRole<int>>().ToTable("UserRoles");
-            modelBuilder.Entity<IdentityUserClaim<int>>().ToTable("UserClaims");
-            modelBuilder.Entity<IdentityUserLogin<int>>().ToTable("UserLogins");
-            modelBuilder.Entity<IdentityUserToken<int>>().ToTable("UserTokens");
-            modelBuilder.Entity<IdentityRoleClaim<int>>().ToTable("RoleClaims");
+            modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+
+            modelBuilder
+                .Entity<User>()
+                .Property(u => u.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Vault configurations
+            modelBuilder
+                .Entity<Vault>()
+                .HasOne(v => v.User)
+                .WithMany(u => u.Vaults)
+                .HasForeignKey(v => v.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Vault>()
+                .Property(v => v.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Credential configurations
+            modelBuilder
+                .Entity<Credential>()
+                .HasOne(c => c.Vault)
+                .WithMany(v => v.Credentials)
+                .HasForeignKey(c => c.VaultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Credential>()
+                .HasOne(c => c.Category)
+                .WithMany(cat => cat.Credentials)
+                .HasForeignKey(c => c.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder
+                .Entity<Credential>()
+                .Property(c => c.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // VaultShare configurations (composite key)
+            modelBuilder.Entity<VaultShare>().HasKey(vs => new { vs.VaultId, vs.UserId });
+
+            modelBuilder
+                .Entity<VaultShare>()
+                .HasOne(vs => vs.Vault)
+                .WithMany(v => v.SharedUsers)
+                .HasForeignKey(vs => vs.VaultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<VaultShare>()
+                .HasOne(vs => vs.User)
+                .WithMany(u => u.SharedVaults)
+                .HasForeignKey(vs => vs.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // AuditLog configurations
+            modelBuilder
+                .Entity<AuditLog>()
+                .HasOne(al => al.User)
+                .WithMany(u => u.AuditLogs)
+                .HasForeignKey(al => al.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<AuditLog>()
+                .Property(al => al.Timestamp)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Seed default categories
+            modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
         }
     }
 }
