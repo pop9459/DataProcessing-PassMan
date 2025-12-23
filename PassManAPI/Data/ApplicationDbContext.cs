@@ -1,15 +1,16 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Models;
 
 namespace PassManAPI.Data
 {
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<int>, int>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }
 
         // Core DbSets
-        public DbSet<User> Users { get; set; }
         public DbSet<Vault> Vaults { get; set; }
         public DbSet<Credential> Credentials { get; set; }
         public DbSet<Category> Categories { get; set; }
@@ -23,12 +24,10 @@ namespace PassManAPI.Data
             // User configurations
             modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
-            modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
-
             modelBuilder
                 .Entity<User>()
                 .Property(u => u.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
             // Vault configurations
             modelBuilder
@@ -41,7 +40,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Vault>()
                 .Property(v => v.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
             // Credential configurations
             modelBuilder
@@ -61,7 +60,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Credential>()
                 .Property(c => c.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
             // VaultShare configurations (composite key)
             modelBuilder.Entity<VaultShare>().HasKey(vs => new { vs.VaultId, vs.UserId });
@@ -91,7 +90,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
