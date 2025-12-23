@@ -1,32 +1,19 @@
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace PassManAPI.Models
 {
+    /// <summary>
+    /// Identity-backed user with additional metadata for vault ownership/audit.
+    /// </summary>
     [Index(nameof(Email), IsUnique = true)]
-    [Index(nameof(Username), IsUnique = true)]
-    public class User
+    public class User : IdentityUser<int>
     {
-        [Key]
-        public int Id { get; set; }
-
-        [Required]
-        [EmailAddress]
-        [MaxLength(255)]
-        public string Email { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(100)]
-        public string Username { get; set; } = string.Empty;
-
-        [Required]
-        [MaxLength(255)] // BCrypt hash is 60 chars, but leave room
-        public string PasswordHash { get; set; } = string.Empty;
-
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
+        public string? EncryptedVaultKey { get; set; }
 
         // Navigation properties
         public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();

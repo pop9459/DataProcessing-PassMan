@@ -70,6 +70,9 @@ public class Program
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             try
             {
+                // Apply pending migrations so Identity + domain tables exist
+                await dbContext.Database.MigrateAsync();
+
                 // Test the database connection
                 var canConnect = await dbContext.Database.CanConnectAsync();
                 if (canConnect)
