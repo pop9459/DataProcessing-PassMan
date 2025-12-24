@@ -63,6 +63,10 @@ public class Program
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
+        // Use BCrypt for password hashing and expose lightweight user manager
+        builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
+        builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
+
         var app = builder.Build();
 
         using (var scope = app.Services.CreateScope())
