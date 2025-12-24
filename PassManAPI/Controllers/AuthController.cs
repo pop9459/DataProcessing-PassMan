@@ -1,4 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using PassManAPI.Data;
+using PassManAPI.DTOs;
+using PassManAPI.Models;
+using PassManAPI.Managers;
 
 namespace PassManAPI.Controllers;
 
@@ -6,35 +12,195 @@ namespace PassManAPI.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    /// <summary>
-    /// Registers a new user.
-    /// </summary>
-    /// <remarks>
-    /// Creates a new user account with the provided email and password.
-    /// </remarks>
-    /// <param name="request">The user registration details.</param>
-    /// <response code="200">If registration is successful.</response>
-    /// <response code="400">If the registration data is invalid.</response>
-    [HttpPost("register")]
-    public IActionResult Register([FromBody] object request)
+    private readonly ApplicationDbContext _db;
+    private readonly UserManager _userManager;
+    private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly ILookupNormalizer _normalizer;
+
+    public AuthController(
+        ApplicationDbContext db,
+        UserManager userManager,
+        IPasswordHasher<User> passwordHasher,
+        ILookupNormalizer normalizer
+    )
     {
-        // TODO: Implement user registration logic
-        return Ok("Not implemented");
+        _db = db;
+        _userManager = userManager;
+        _passwordHasher = passwordHasher;
+        _normalizer = normalizer;
     }
 
     /// <summary>
-    /// Authenticates a user.
+    /// Registers a new user. Returns a placeholder token until JWT is added.
     /// </summary>
-    /// <remarks>
-    /// Validates credentials and returns a JWT token for authenticated access.
-    /// </remarks>
-    /// <param name="request">The login credentials.</param>
-    /// <response code="200">Returns the JWT token.</response>
-    /// <response code="401">If authentication fails.</response>
-    [HttpPost("login")]
-    public IActionResult Login([FromBody] object request)
+    [HttpPost("register")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        // TODO: Implement user login logic
-        return Ok("Not implemented");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var result = await _userManager.CreateUserAsync(
+            new CreateUserRequest(
+                request.Email,
+                request.Password,
+                request.UserName,
+                request.PhoneNumber,
+                request.EncryptedVaultKey
+            )
+        );
+
+        if (!result.Success || result.Data is null)
+        {
+            return BadRequest(result.Error ?? "Registration failed.");
+        }
+
+        var token = $"dev-token-{result.Data.Id}";
+        var response = new AuthResponse(token, ToProfile(result.Data));
+        return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
+
+    /// <summary>
+    /// Authenticates a user and returns a placeholder token.
+    /// </summary>
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var normalizedEmail = _normalizer.NormalizeEmail(request.Email.Trim()) ?? request.Email.Trim().ToUpperInvariant();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
+        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return Unauthorized("Invalid credentials.");
+        }
+
+        var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        if (verify == PasswordVerificationResult.Failed)
+        {
+            return Unauthorized("Invalid credentials.");
+        }
+
+        user.LastLoginAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var token = $"dev-token-{user.Id}";
+        return Ok(new AuthResponse(token, ToProfile(user)));
+    }
+
+    /// <summary>
+    /// Returns the current user's profile using a dev-only X-UserId header.
+    /// </summary>
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetCurrentUser([FromHeader(Name = "X-UserId")] int? userId)
+    {
+        if (userId is null)
+        {
+            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+        }
+
+        var result = await _userManager.GetUserByIdAsync(userId.Value);
+        if (!result.Success || result.Data is null)
+        {
+            return NotFound("User not found.");
+        }
+
+        return Ok(ToProfile(result.Data));
+    }
+
+    /// <summary>
+    /// Updates the current user's profile (email/username/phone/encrypted key).
+    /// </summary>
+    [HttpPut("me")]
+    [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> UpdateProfile(
+        [FromHeader(Name = "X-UserId")] int? userId,
+        [FromBody] UpdateProfileRequest request
+    )
+    {
+        if (userId is null)
+        {
+            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var result = await _userManager.UpdateUserAsync(
+            userId.Value,
+            new UpdateUserRequest(
+                request.Email,
+                request.UserName,
+                request.PhoneNumber,
+                request.EncryptedVaultKey
+            )
+        );
+
+        if (!result.Success || result.Data is null)
+        {
+            return BadRequest(result.Error ?? "Update failed.");
+        }
+
+        return Ok(ToProfile(result.Data));
+    }
+
+    /// <summary>
+    /// Deletes the current user's account.
+    /// </summary>
+    [HttpDelete("me")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteAccount([FromHeader(Name = "X-UserId")] int? userId)
+    {
+        if (userId is null)
+        {
+            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+        }
+
+        var result = await _userManager.DeleteUserAsync(userId.Value);
+        if (!result.Success)
+        {
+            return NotFound(result.Error ?? "User not found.");
+        }
+
+        return NoContent();
+    }
+
+    private static UserProfileResponse ToProfile(User user) =>
+        new(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.UserName,
+            user.PhoneNumber,
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.LastLoginAt,
+            user.EncryptedVaultKey
+        );
+
+    private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
+        new(
+            user.Id,
+            user.Email,
+            user.UserName,
+            user.PhoneNumber,
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.LastLoginAt,
+            user.EncryptedVaultKey
+        );
 }

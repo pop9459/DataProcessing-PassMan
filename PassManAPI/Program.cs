@@ -29,13 +29,21 @@ public class Program
             );
         });
 
-        // Add the DB Context
-        builder.Services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseMySql(
-                builder.Configuration.GetConnectionString("DefaultConnection"),
-                new MySqlServerVersion(new Version(8, 0, 0))
-            )
-        );
+        // Add the DB Context (use Sqlite for tests, MySQL otherwise)
+        if (builder.Environment.IsEnvironment("Test"))
+        {
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlite("DataSource=:memory:"));
+        }
+        else
+        {
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseMySql(
+                    builder.Configuration.GetConnectionString("DefaultConnection"),
+                    new MySqlServerVersion(new Version(8, 0, 0))
+                )
+            );
+        }
 
         //Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
@@ -62,6 +70,10 @@ public class Program
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // Use BCrypt for password hashing and expose lightweight user manager
+        builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
+        builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
 
         var app = builder.Build();
 
