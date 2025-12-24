@@ -8,6 +8,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  passman-gui:
+    build: ./PassManGUI
+    ports:
+      - "5247:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://passman-api:8080
+    depends_on:
+      - passman-api
+
   db:
    image: mysql:8.0
    container_name: db

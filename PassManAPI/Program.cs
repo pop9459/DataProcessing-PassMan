@@ -7,7 +7,6 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
-using PassManAPI.Components;
 
 public class Program
 {
@@ -16,8 +15,6 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents(); // Blazor components
         builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
@@ -37,8 +34,9 @@ public class Program
             )
         );
 
-        //Add DB Health Service
+        // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
+        
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
@@ -62,6 +60,18 @@ public class Program
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // Configure CORS for frontend
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowFrontend", policy =>
+            {
+                policy.WithOrigins("https://localhost:5001", "http://localhost:5000") // PassManGUI URLs
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            });
+        });
 
         var app = builder.Build();
 
@@ -109,28 +119,17 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        // Configure the HTTP request pipeline.
-        if (!app.Environment.IsDevelopment())
-        {
-            app.UseExceptionHandler("/Error", createScopeForErrors: true);
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-            app.UseHsts();
-        }
-        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
         app.UseHttpsRedirection();
+
+        // Enable CORS
+        app.UseCors("AllowFrontend");
 
         // Authentication & Authorization middleware
         app.UseAuthentication();
         app.UseAuthorization();
 
-        app.UseAntiforgery();
-
-        // Map controller routes BEFORE Blazor to prioritize API endpoints
+        // Map controller routes (API only)
         app.MapControllers();
-
-        app.MapStaticAssets();
-        app.MapRazorComponents<App>()
-            .AddInteractiveServerRenderMode();
 
         app.Run();
     }
