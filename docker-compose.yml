@@ -5,6 +5,7 @@ services:
       - "5246:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=root;Password=hihi;Pooling=true
     depends_on:
       db:
         condition: service_healthy
