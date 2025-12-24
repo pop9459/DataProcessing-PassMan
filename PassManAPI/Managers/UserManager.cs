@@ -88,6 +88,12 @@ public class UserManager
         var userName = string.IsNullOrWhiteSpace(request.UserName) ? email : request.UserName.Trim();
         var normalizedUserName = _normalizer.NormalizeName(userName) ?? userName.ToUpperInvariant();
 
+        var usernameInUse = await _db.Users.AsNoTracking().AnyAsync(u => u.NormalizedUserName == normalizedUserName);
+        if (usernameInUse)
+        {
+            return UserOperationResult<UserResponse>.Fail("Username is already in use.");
+        }
+
         var user = new User
         {
             Email = email,
@@ -146,7 +152,17 @@ public class UserManager
         {
             var userName = request.UserName.Trim();
             user.UserName = userName;
-            user.NormalizedUserName = _normalizer.NormalizeName(userName) ?? userName.ToUpperInvariant();
+            var normalizedUserName = _normalizer.NormalizeName(userName) ?? userName.ToUpperInvariant();
+
+            var usernameInUse = await _db.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id != id && u.NormalizedUserName == normalizedUserName);
+            if (usernameInUse)
+            {
+                return UserOperationResult<UserResponse>.Fail("Username is already in use.");
+            }
+
+            user.NormalizedUserName = normalizedUserName;
             user.ConcurrencyStamp = Guid.NewGuid().ToString();
         }
 
