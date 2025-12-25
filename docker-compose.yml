@@ -1,13 +1,37 @@
 services:
   passman-api:
-    build: ./PassManAPI
+    build:
+      context: ./PassManAPI
+      dockerfile: dockerfile.dev
     ports:
       - "5246:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=root;Password=hihi;Pooling=true
+    volumes:
+      - ./PassManAPI:/app
     depends_on:
       db:
         condition: service_healthy
+
+  passman-gui:
+    build:
+      context: ./PassManGUI
+      dockerfile: dockerfile.dev
+    ports:
+      - "5247:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      - ApiBaseUrl=http://passman-api:8080
+    volumes:
+      - ./PassManGUI:/app
+    depends_on:
+      - passman-api
+
   db:
    image: mysql:8.0
    container_name: db

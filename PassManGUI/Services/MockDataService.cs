@@ -1,8 +1,8 @@
-namespace PassManAPI.Services;
+namespace PassManGUI.Services;
 
 /// <summary>
 /// Temporary mock data service for development
-/// TODO: Replace with actual API service calls
+/// TODO: Replace with actual API service calls via HttpClient
 /// </summary>
 public static class MockDataService
 {
@@ -170,7 +170,6 @@ public static class MockDataService
         };
     }
 
-    // TODO: Move to shared Models folder
     public class VaultModel
     {
         public int Id { get; set; }
