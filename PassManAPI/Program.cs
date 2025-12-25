@@ -66,7 +66,11 @@ public class Program
         {
             options.AddPolicy("AllowFrontend", policy =>
             {
-                policy.WithOrigins("https://localhost:5001", "http://localhost:5000") // PassManGUI URLs
+                policy.WithOrigins(
+                        "http://localhost:5247",      // PassManGUI Docker port
+                        "http://localhost:5127",      // PassManGUI local dev port
+                        "http://passman-gui:8080"     // Docker internal network
+                      )
                       .AllowAnyHeader()
                       .AllowAnyMethod()
                       .AllowCredentials();
