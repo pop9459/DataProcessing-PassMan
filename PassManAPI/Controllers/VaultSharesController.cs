@@ -62,7 +62,7 @@ public class VaultSharesController : ControllerBase
             );
         if (!canShare)
         {
-            return Forbid("You do not have permission to share this vault.");
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to share this vault.");
         }
 
         var normalizedEmail =
@@ -139,7 +139,7 @@ public class VaultSharesController : ControllerBase
             );
         if (!canShare)
         {
-            return Forbid("You do not have permission to revoke access.");
+            return StatusCode(StatusCodes.Status403Forbidden, "You do not have permission to revoke access.");
         }
 
         var share = await _db.VaultShares.FirstOrDefaultAsync(vs =>
