@@ -1,47 +1,188 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PassManAPI.Data;
+using PassManAPI.Models;
 
 namespace PassManAPI.Controllers;
 
 [ApiController]
-[Route("api/vaults/{vaultId}/share")]
+[Route("api/vaults/{vaultId:int}/share")]
 public class VaultSharesController : ControllerBase
 {
-    /// <summary>
-    /// Shares a vault with another user.
-    /// </summary>
-    /// <remarks>
-    /// Grants access to a specific vault to another user via their email.
-    /// </remarks>
-    /// <param name="vaultId">The unique identifier of the vault.</param>
-    /// <param name="request">The sharing details (user email, permission level).</param>
-    /// <response code="200">If the share is successful.</response>
-    /// <response code="400">If the request is invalid.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user does not have permission to share the vault.</response>
-    /// <response code="404">If the vault or user is not found.</response>
-    [HttpPost]
-    public IActionResult ShareVault(int vaultId, [FromBody] object request)
+    private readonly ApplicationDbContext _db;
+    private readonly ILookupNormalizer _normalizer;
+
+    public VaultSharesController(ApplicationDbContext db, ILookupNormalizer normalizer)
     {
-        // TODO: Implement vault sharing logic
-        return Ok("Not implemented");
+        _db = db;
+        _normalizer = normalizer;
     }
 
     /// <summary>
-    /// Revokes access to a vault for a user.
+    /// Share a vault with another user (view/edit/admin). Admin or owner can share.
     /// </summary>
-    /// <remarks>
-    /// Removes a user's access to a specific vault.
-    /// </remarks>
-    /// <param name="vaultId">The unique identifier of the vault.</param>
-    /// <param name="userId">The unique identifier of the user to remove.</param>
-    /// <response code="204">If the access is revoked successfully.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user does not have permission to revoke access.</response>
-    /// <response code="404">If the vault or user share is not found.</response>
-    [HttpDelete("{userId}")]
-    public IActionResult RevokeShare(int vaultId, int userId)
+    [HttpPost]
+    [ProducesResponseType(typeof(VaultShareResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ShareVault(
+        int vaultId,
+        [FromHeader(Name = "X-UserId")] int? currentUserId,
+        [FromBody] ShareVaultRequest request
+    )
     {
-        // TODO: Implement share revocation logic
-        return Ok("Not implemented");
+        if (currentUserId is null)
+        {
+            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var vault = await _db.Vaults
+            .Include(v => v.SharedUsers)
+            .AsTracking()
+            .FirstOrDefaultAsync(v => v.Id == vaultId);
+        if (vault is null)
+        {
+            return NotFound("Vault not found.");
+        }
+
+        var canShare = vault.UserId == currentUserId
+            || await _db.VaultShares.AnyAsync(vs =>
+                vs.VaultId == vaultId
+                && vs.UserId == currentUserId
+                && vs.Permission == SharePermission.Admin
+            );
+        if (!canShare)
+        {
+            return Forbid("You do not have permission to share this vault.");
+        }
+
+        var normalizedEmail =
+            _normalizer.NormalizeEmail(request.Email.Trim()) ?? request.Email.Trim().ToUpperInvariant();
+        var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
+        if (targetUser is null)
+        {
+            return NotFound("Target user not found.");
+        }
+
+        if (targetUser.Id == vault.UserId)
+        {
+            return BadRequest("Owner already has access.");
+        }
+
+        var share = await _db.VaultShares.FirstOrDefaultAsync(vs =>
+            vs.VaultId == vaultId && vs.UserId == targetUser.Id
+        );
+
+        if (share is null)
+        {
+            share = new VaultShare
+            {
+                VaultId = vaultId,
+                UserId = targetUser.Id,
+                Permission = request.Permission,
+                SharedAt = DateTime.UtcNow,
+                SharedByUserId = currentUserId
+            };
+            _db.VaultShares.Add(share);
+        }
+        else
+        {
+            share.Permission = request.Permission;
+            share.SharedByUserId = currentUserId;
+            share.SharedAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(ToResponse(share, targetUser));
     }
+
+    /// <summary>
+    /// Revoke a user's access to a vault. Admin or owner can revoke.
+    /// </summary>
+    [HttpDelete("{userId:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeShare(
+        int vaultId,
+        int userId,
+        [FromHeader(Name = "X-UserId")] int? currentUserId
+    )
+    {
+        if (currentUserId is null)
+        {
+            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+        }
+
+        var vault = await _db.Vaults.AsNoTracking().FirstOrDefaultAsync(v => v.Id == vaultId);
+        if (vault is null)
+        {
+            return NotFound("Vault not found.");
+        }
+
+        var canShare = vault.UserId == currentUserId
+            || await _db.VaultShares.AnyAsync(vs =>
+                vs.VaultId == vaultId
+                && vs.UserId == currentUserId
+                && vs.Permission == SharePermission.Admin
+            );
+        if (!canShare)
+        {
+            return Forbid("You do not have permission to revoke access.");
+        }
+
+        var share = await _db.VaultShares.FirstOrDefaultAsync(vs =>
+            vs.VaultId == vaultId && vs.UserId == userId
+        );
+        if (share is null)
+        {
+            return NotFound("Share not found.");
+        }
+
+        _db.VaultShares.Remove(share);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private static VaultShareResponse ToResponse(VaultShare share, User user) =>
+        new(
+            share.VaultId,
+            user.Id,
+            user.Email ?? string.Empty,
+            share.Permission,
+            share.SharedAt,
+            share.SharedByUserId
+        );
+
+    public class ShareVaultRequest
+    {
+        [Required]
+        [EmailAddress]
+        [StringLength(256)]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [EnumDataType(typeof(SharePermission))]
+        public SharePermission Permission { get; set; } = SharePermission.View;
+    }
+
+    public record VaultShareResponse(
+        int VaultId,
+        int UserId,
+        string Email,
+        SharePermission Permission,
+        DateTime SharedAt,
+        int? SharedByUserId
+    );
 }
