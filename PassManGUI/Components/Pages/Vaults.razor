@@ -1,35 +1,29 @@
 @page "/vaults"
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
+@inject AuthService AuthService
+@inject IApiService ApiService
 @using PassManGUI.Services
-@using static PassManGUI.Services.MockDataService
+@using PassManGUI.Models
 
 @* 
     Vaults Page - Main dashboard displaying all user's vaults
     
+    Status: ✅ Connected to API via ApiService and AuthService
+    
     TODO:
-    1. Authentication
-       - Check user authentication status
-       - Redirect to /login if unauthenticated
-       - Load current user context
-    
-    2. API Integration
-       - Replace mock data with VaultService.GetUserVaultsAsync()
-       - Handle API errors gracefully
-       - Implement proper loading states
-    
-    3. Vault Management
+    1. Vault Management
        - Create vault modal/form
        - Edit vault functionality
        - Delete vault with confirmation
        - Share vault with other users
     
-    4. Search & Filter
+    2. Search & Filter
        - Search vaults by name
        - Filter by date modified, item count
        - Sort options (name, date, items)
     
-    5. User Interface
+    3. User Interface
        - User profile dropdown menu
        - Settings page navigation
        - Logout functionality
@@ -55,7 +49,25 @@
             
             <!-- Content Section -->
             <div class="vaults-content">
-                @if (vaults.Count == 0)
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading vaults...</p>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <h2>Failed to load vaults</h2>
+                        <p>@errorMessage</p>
+                        <button class="btn-primary" @onclick="LoadVaults">Try Again</button>
+                    </div>
+                }
+                else if (vaults.Count == 0)
                 {
                     <!-- Empty State -->
                     <div class="empty-state">
@@ -74,12 +86,24 @@
                     <div class="vaults-grid">
                         @foreach (var vault in vaults)
                         {
-                            <VaultCard 
-                                Name="@vault.Name"
-                                Description="@vault.Description"
-                                ItemCount="@vault.ItemCount"
-                                LastModified="@vault.LastModified"
-                                OnClick="() => OpenVault(vault.Id)" />
+                            <div class="vault-card" @onclick="() => OpenVault(vault.Id)">
+                                <div class="vault-card-header">
+                                    <h3>@vault.Name</h3>
+                                </div>
+                                @if (!string.IsNullOrEmpty(vault.Description))
+                                {
+                                    <p class="vault-description">@vault.Description</p>
+                                }
+                                <div class="vault-card-footer">
+                                    <span class="last-modified">
+                                        Created @vault.CreatedAt.ToString("MMM dd, yyyy")
+                                        @if (vault.UpdatedAt != default && vault.UpdatedAt != vault.CreatedAt)
+                                        {
+                                            <span> • Updated @vault.UpdatedAt.ToString("MMM dd, yyyy")</span>
+                                        }
+                                    </span>
+                                </div>
+                            </div>
                         }
                     </div>
                 }
@@ -89,26 +113,76 @@
 </div>
 
 @code {
-    private List<VaultModel> vaults = new();
+    private List<VaultResponse> vaults = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private bool isAuthenticated = false;
+    private bool hasCheckedAuth = false;
     
-    protected override Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        LoadMockData();
-        return Task.CompletedTask;
+        if (firstRender)
+        {
+            // JS interop is only available after first render
+            var userId = await AuthService.GetUserIdAsync();
+            
+            if (!userId.HasValue)
+            {
+                Console.WriteLine("[Vaults] No userId found, redirecting to login");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            Console.WriteLine($"[Vaults] User authenticated: userId={userId}");
+            isAuthenticated = true;
+            hasCheckedAuth = true;
+            await LoadVaults();
+            StateHasChanged();
+        }
     }
     
-    private void LoadMockData()
+    private async Task LoadVaults()
     {
-        // TODO: Replace with actual API call
-        // vaults = await VaultService.GetUserVaultsAsync();
-        
-        vaults = MockDataService.GetVaults();
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+            
+            var userId = await AuthService.GetUserIdAsync();
+            if (!userId.HasValue)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            var result = await ApiService.GetVaultsAsync(userId.Value);
+            
+            if (result.Success && result.Data != null)
+            {
+                vaults = result.Data;
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Failed to load vaults.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while loading vaults.";
+            Console.WriteLine($"Load vaults error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
     
     private void CreateVault()
     {
-        // TODO: Implement vault creation
-        // Options: Modal dialog or navigate to dedicated creation page
+        // TODO: Implement vault creation modal/page
+        Console.WriteLine("Create vault clicked");
     }
     
     private void OpenVault(int vaultId)

@@ -1,4 +1,5 @@
 using PassManGUI.Components;
+using PassManGUI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,12 +11,16 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpClient("PassManAPI", client =>
 {
     // Use environment variable or fallback to localhost for development
-    var apiUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7001";
+    var apiUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5246";
     client.BaseAddress = new Uri(apiUrl);
 });
 
 // Register a typed HttpClient for dependency injection
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("PassManAPI"));
+
+// Register API services
+builder.Services.AddScoped<IApiService, ApiService>();
+builder.Services.AddScoped<AuthService>();
 
 var app = builder.Build();
 

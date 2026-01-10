@@ -1,37 +1,29 @@
 @page "/signup"
 @rendermode InteractiveServer
+@using PassManGUI.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
 
 @* 
     Authentication Page - User Sign Up
     
+    Status: ✅ Connected to API via AuthService
+    
     TODO:
-    1. Add form validation and error handling
+    1. Add enhanced form validation
        - Validate username format (3-20 chars, alphanumeric + underscore)
-       - Validate email format
        - Validate password strength (min 8 chars, uppercase, lowercase, number, special char)
-       - Validate password match (password === confirmPassword)
        - Check username availability via API
        - Display validation messages inline
     
-    2. Implement signup API call
-       - Create AuthService to handle registration
-       - Call POST /api/auth/signup endpoint
-       - Handle successful signup (auto-login or redirect to email verification)
-       - Handle failed signup (display error: username taken, email exists, etc.)
-    
-    3. Implement OAuth signup
+    2. Implement OAuth signup
        - Google OAuth flow
        - GitHub OAuth flow
        - X OAuth flow
     
-    4. Create Terms of Service and Privacy Policy pages (I don't know about this, we can discuss it)
+    3. Create Terms of Service and Privacy Policy pages (discuss with team)
        - Add /terms route and page
        - Add /privacy route and page
-    
-    5. Add loading states (nice to have)
-       - Disable submit button during API call
-       - Show loading spinner on button
-       - Prevent double-submission
 *@
 
 <PageTitle>Sign Up - PassMan</PageTitle>
@@ -76,22 +68,31 @@
         </div>
 
         <!-- Sign Up Form -->
-        <form class="auth-form" id="signupForm">
-            @* TODO: Convert to EditForm with model binding and DataAnnotationsValidator *@
+        <form class="auth-form" id="signupForm" @onsubmit="HandleSignup" @onsubmit:preventDefault="true">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="error-message">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 10.5a.75.75 0 110 1.5.75.75 0 010-1.5zm.75-7.25a.75.75 0 00-1.5 0v4a.75.75 0 001.5 0v-4z" fill="currentColor"/>
+                    </svg>
+                    @errorMessage
+                </div>
+            }
+            
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" placeholder="Choose a username..." required />
+                <input type="text" id="username" @bind="username" placeholder="Choose a username..." required disabled="@isLoading" />
             </div>
 
             <div class="form-group">
                 <label for="email">E-Mail Address</label>
-                <input type="email" id="email" placeholder="Enter your email..." required />
+                <input type="email" id="email" @bind="email" placeholder="Enter your email..." required disabled="@isLoading" />
             </div>
 
             <div class="form-group">
                 <label for="password">Password</label>
                 <div class="password-input">
-                    <input type="@(showPassword ? "text" : "password")" id="password" placeholder="••••••••••" required />
+                    <input type="@(showPassword ? "text" : "password")" id="password" @bind="password" placeholder="••••••••••" required disabled="@isLoading" />
                     <button type="button" class="toggle-password" @onclick="TogglePasswordVisibility" aria-label="Toggle password visibility">
                         <svg class="eye-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" style="opacity: @(showPassword ? "0.5" : "1")">
                             <path d="M10 4C5 4 1.73 7.11 1 10c.73 2.89 4 6 9 6s8.27-3.11 9-6c-.73-2.89-4-6-9-6zm0 10a4 4 0 110-8 4 4 0 010 8zm0-6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="currentColor"/>
@@ -103,7 +104,7 @@
             <div class="form-group">
                 <label for="confirmPassword">Confirm Password</label>
                 <div class="password-input">
-                    <input type="@(showConfirmPassword ? "text" : "password")" id="confirmPassword" placeholder="••••••••••" required />
+                    <input type="@(showConfirmPassword ? "text" : "password")" id="confirmPassword" @bind="confirmPassword" placeholder="••••••••••" required disabled="@isLoading" />
                     <button type="button" class="toggle-confirm-password" @onclick="ToggleConfirmPasswordVisibility" aria-label="Toggle password visibility">
                         <svg class="eye-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" style="opacity: @(showConfirmPassword ? "0.5" : "1")">
                             <path d="M10 4C5 4 1.73 7.11 1 10c.73 2.89 4 6 9 6s8.27-3.11 9-6c-.73-2.89-4-6-9-6zm0 10a4 4 0 110-8 4 4 0 010 8zm0-6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="currentColor"/>
@@ -114,13 +115,21 @@
 
             <div class="form-group">
                 <label class="checkbox-label terms-checkbox">
-                    <input type="checkbox" id="terms" required />
+                    <input type="checkbox" id="terms" @bind="agreeToTerms" required disabled="@isLoading" />
                     <span>I agree to the <a href="/terms" class="link-text-bold">Terms of Service</a> and <a href="/privacy" class="link-text-bold">Privacy Policy</a></span>
                 </label>
             </div>
 
-            @* TODO: Add form submit handler - call HandleSignup() method, validate inputs, check password match, make API call *@
-            <button type="submit" class="btn-primary">Create account</button>
+            <button type="submit" class="btn-primary" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span>Creating account...</span>
+                }
+                else
+                {
+                    <span>Create account</span>
+                }
+            </button>
         </form>
 
         <!-- Login Link -->
@@ -133,6 +142,13 @@
 @code {
     private bool showPassword = false;
     private bool showConfirmPassword = false;
+    private bool isLoading = false;
+    private bool agreeToTerms = false;
+    private string username = string.Empty;
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string confirmPassword = string.Empty;
+    private string errorMessage = string.Empty;
 
     private void TogglePasswordVisibility()
     {
@@ -142,5 +158,74 @@
     private void ToggleConfirmPasswordVisibility()
     {
         showConfirmPassword = !showConfirmPassword;
+    }
+
+    private async Task HandleSignup()
+    {
+        // Clear previous errors
+        errorMessage = string.Empty;
+        
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errorMessage = "Please enter a username.";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            errorMessage = "Please enter your email address.";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Please enter a password.";
+            return;
+        }
+        
+        if (password != confirmPassword)
+        {
+            errorMessage = "Passwords do not match.";
+            return;
+        }
+        
+        if (!agreeToTerms)
+        {
+            errorMessage = "You must agree to the Terms of Service and Privacy Policy.";
+            return;
+        }
+        
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            
+            // PhoneNumber is optional - only pass if we add a phone number field in the future
+            var result = await AuthService.RegisterAsync(email, password, confirmPassword, username, phoneNumber: null);
+            
+            if (result.Success)
+            {
+                // Small delay to ensure sessionStorage is persisted
+                await Task.Delay(100);
+                
+                // Registration successful, AuthService auto-logs in, redirect to vaults
+                Navigation.NavigateTo("/vaults");
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during registration. Please try again.";
+            Console.WriteLine($"Registration error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 }
