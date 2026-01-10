@@ -119,3 +119,11 @@ To access the Swagger documentation for the API, run the application and navigat
 - **URL**: `http://localhost:5246/swagger`
 
 This will display the Swagger UI, which provides detailed information about the available endpoints, models, and allows you to interact with the API directly.
+
+## Testing
+
+- Integration tests live in `PassManAPI.Tests` and run the API with a test `WebApplicationFactory` using in-memory SQLite (no MySQL needed).
+- Just run from the root directory:
+    ```
+    dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
+    ``` 
