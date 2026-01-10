@@ -76,6 +76,10 @@ public class Program
                       .AllowCredentials();
             });
         });
+        
+        // Use BCrypt for password hashing and expose lightweight user manager
+        builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
+        builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
 
         var app = builder.Build();
 
