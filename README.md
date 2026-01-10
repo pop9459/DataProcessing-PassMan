@@ -31,15 +31,40 @@ This repository contains the source code for the Password Manager API, a project
     ```
     cd DataProcessing-PassMan
     ```
-4. Restore 
-    ```
-    dotnet restore
-    ```
 5. Run the project
     ```
     dotnet run --project PassManAPI
     ``` 
 6. Open http://localhost:5246/
+
+### Troubleshooting
+
+If you encounter build errors, try running the following commands from the root of the repository.
+
+First, restore dependencies and clean the project:
+```
+dotnet restore
+```
+```
+dotnet clean
+```
+
+If issues persist, manually delete the `bin` and `obj` directories.
+
+**On Linux / macOS:**
+```bash
+rm -rf bin obj
+```
+
+**On Windows (Command Prompt):**
+```batch
+rmdir /s /q bin obj
+```
+
+**On Windows (PowerShell):**
+```powershell
+Remove-Item -Recurse -Force bin, obj
+```
 
 ## Accessing the database manually
 
