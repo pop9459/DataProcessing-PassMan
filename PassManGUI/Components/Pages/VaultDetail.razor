@@ -1,34 +1,30 @@
 @page "/vault/{VaultId:int}"
 @rendermode InteractiveServer
+@inject AuthService AuthService
+@inject IApiService ApiService
+@inject NavigationManager Navigation
 @using PassManGUI.Services
-@using static PassManGUI.Services.MockDataService
+@using PassManGUI.Models
 
 @* 
     Vault Detail Page - Displays items within a specific vault
     
+    Status: ✅ Connected to API via ApiService and AuthService
+    
     TODO:
-    1. Add authentication check
-       - Redirect to /login if not authenticated
-       - Verify user has access to this vault
-    
-    2. Load vault items from API
-       - Call GET /api/vaults/{id}/items endpoint
-       - Display loading state while fetching
-       - Handle empty state (no items in vault)
-    
-    3. Implement item actions
+    1. Implement item actions
        - Add new item (modal/page)
        - Edit item (modal/inline)
        - Delete item (confirmation dialog)
        - Copy password to clipboard
        - View password (toggle visibility)
     
-    4. Add search/filter functionality
+    2. Add search/filter functionality
        - Search items by name/username
        - Filter by category/type
        - Sort options (name, date, etc.)
     
-    5. Vault settings
+    3. Vault settings
        - Edit vault name/description
        - Delete vault
        - Share vault with users
@@ -67,7 +63,25 @@
             
             <!-- Content -->
             <div class="vault-detail-content">
-                @if (items.Count == 0)
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading items...</p>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <h2>Failed to load items</h2>
+                        <p>@errorMessage</p>
+                        <button class="btn-primary" @onclick="LoadVaultItems">Try Again</button>
+                    </div>
+                }
+                else if (items.Count == 0)
                 {
                     <div class="empty-state">
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
@@ -85,13 +99,33 @@
                         <div class="items-list">
                             @foreach (var item in items)
                             {
-                                <ItemCard 
-                                    Name="@item.Name"
-                                    Username="@item.Username"
-                                    Url="@item.Url"
-                                    Label="@item.Label"
-                                    CreatedAt="@item.CreatedAt"
-                                    OnClick="() => OpenItem(item.Id)" />
+                                <div class="item-card" @onclick="() => OpenItem(item.Id)">
+                                    <div class="item-card-content">
+                                        <div class="item-header">
+                                            <h3>@item.Name</h3>
+                                            @if (!string.IsNullOrEmpty(item.Label))
+                                            {
+                                                <span class="item-label">@item.Label</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(item.Username))
+                                        {
+                                            <p class="item-username">@item.Username</p>
+                                        }
+                                        @if (!string.IsNullOrEmpty(item.Url))
+                                        {
+                                            <p class="item-url">@item.Url</p>
+                                        }
+                                        <p class="item-created">Created @item.FormatTimeAgo()</p>
+                                    </div>
+                                    <div class="item-card-actions">
+                                        <button type="button" class="icon-btn" title="View details">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                             }
                         </div>
                     </div>
@@ -101,22 +135,6 @@
     </div>
 </div>
 
-<!-- Item Detail Panel (outside page-grid for fixed positioning) -->
-<ItemDetailPanel 
-    IsOpen="isPanelOpen"
-    ItemName="@selectedItemName"
-    ItemUsername="@selectedItemUsername"
-    ItemPassword="@selectedItemPassword"
-    ItemUrl="@selectedItemUrl"
-    ItemLabel="@selectedItemLabel"
-    ItemNotes="@selectedItemNotes"
-    ItemTags="@selectedItemTags"
-    ItemCreatedAt="@selectedItemCreatedAt"
-    ItemUpdatedAt="@selectedItemUpdatedAt"
-    OnClose="ClosePanel"
-    OnEdit="EditItem"
-    OnDelete="DeleteItem" />
-
 @code {
     [Parameter]
     public int VaultId { get; set; }
@@ -124,156 +142,86 @@
     private string vaultName = "";
     private string vaultDescription = "";
     private List<VaultItemModel> items = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private bool isAuthenticated = false;
+    private bool hasCheckedAuth = false;
     
-    // Panel state
-    private bool isPanelOpen = false;
-    private int selectedItemId = 0;
-    private string selectedItemName = "";
-    private string selectedItemUsername = "";
-    private string selectedItemPassword = "";
-    private string selectedItemUrl = "";
-    private string selectedItemLabel = "";
-    private string selectedItemNotes = "";
-    private string selectedItemTags = "";
-    private string selectedItemCreatedAt = "";
-    private string selectedItemUpdatedAt = "";
-    
-    protected override Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // TODO: Replace with actual API calls
-        // Load vault details: var vault = await VaultService.GetVaultAsync(VaultId);
-        // Load vault items: items = await VaultService.GetVaultItemsAsync(VaultId);
-        
-        // Mock data based on VaultId
-        LoadMockData();
-        
-        return Task.CompletedTask;
+        if (firstRender)
+        {
+            // JS interop is only available after first render
+            var userId = await AuthService.GetUserIdAsync();
+            
+            if (!userId.HasValue)
+            {
+                Console.WriteLine("[VaultDetail] No userId found, redirecting to login");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            Console.WriteLine($"[VaultDetail] User authenticated: userId={userId}");
+            isAuthenticated = true;
+            hasCheckedAuth = true;
+            await LoadVaultItems();
+            StateHasChanged();
+        }
     }
     
-    private void LoadMockData()
+    private async Task LoadVaultItems()
     {
-        vaultName = MockDataService.GetVaultName(VaultId);
-        vaultDescription = MockDataService.GetVaultDescription(VaultId);
-        items = MockDataService.GetVaultItems(VaultId);
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+            
+            // Load vault details
+            var vaultResult = await ApiService.GetVaultByIdAsync(VaultId);
+            if (vaultResult.Success && vaultResult.Data != null)
+            {
+                vaultName = vaultResult.Data.Name;
+                vaultDescription = vaultResult.Data.Description ?? "";
+            }
+            else
+            {
+                errorMessage = "Vault not found.";
+                return;
+            }
+            
+            // Load vault items
+            var itemsResult = await ApiService.GetVaultItemsAsync(VaultId);
+            if (itemsResult.Success && itemsResult.Data != null)
+            {
+                items = itemsResult.Data;
+            }
+            else
+            {
+                errorMessage = itemsResult.ErrorMessage ?? "Failed to load items.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while loading vault items.";
+            Console.WriteLine($"Load vault items error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
     
     private void AddItem()
     {
-        // TODO: Open add item modal or navigate to add page
+        // TODO: Implement add item modal/page
         Console.WriteLine("Add item clicked");
     }
     
     private void OpenItem(int itemId)
     {
-        // Load item details and open panel
-        selectedItemId = itemId;
-        LoadItemDetails(itemId);
-        isPanelOpen = true;
+        // TODO: Implement item detail view/modal
+        Console.WriteLine($"Open item {itemId}");
     }
-    
-    private void LoadItemDetails(int itemId)
-    {
-        // TODO: Replace with actual API call to get full item details
-        // For now, use mock data based on itemId
-        
-        selectedItemName = itemId switch
-        {
-            1 => "Gmail Account",
-            2 => "GitHub",
-            3 => "Netflix",
-            4 => "Office 365",
-            5 => "Slack",
-            _ => "Unknown Item"
-        };
-        
-        selectedItemUsername = itemId switch
-        {
-            1 => "john.doe@gmail.com",
-            2 => "johndoe",
-            3 => "john.doe@gmail.com",
-            4 => "john.doe@company.com",
-            5 => "john.doe@company.com",
-            _ => ""
-        };
-        
-        selectedItemPassword = "MySecurePassword123!"; // Mock password
-        
-        selectedItemUrl = itemId switch
-        {
-            1 => "https://mail.google.com",
-            2 => "https://github.com",
-            3 => "https://netflix.com",
-            4 => "https://office.com",
-            5 => "https://slack.com",
-            _ => ""
-        };
-        
-        selectedItemLabel = itemId switch
-        {
-            1 => "Personal",
-            2 => "",
-            3 => "Streaming",
-            4 => "Work",
-            5 => "",
-            _ => ""
-        };
-        
-        selectedItemNotes = itemId switch
-        {
-            1 => "Primary email account for personal use. Enable 2FA for extra security.",
-            2 => "Development account with access to personal repositories.",
-            3 => "Family streaming subscription - shared with household.",
-            4 => "Corporate email and office suite access.",
-            5 => "Company workspace communication tool.",
-            _ => ""
-        };
-        
-        selectedItemTags = itemId switch
-        {
-            1 => "email, google, primary",
-            2 => "development, coding, git",
-            3 => "streaming, entertainment, family",
-            4 => "work, email, office",
-            5 => "work, communication, team",
-            _ => ""
-        };
-        
-        selectedItemCreatedAt = itemId switch
-        {
-            1 => "January 15, 2024",
-            2 => "March 22, 2024",
-            3 => "June 10, 2024",
-            4 => "December 5, 2023",
-            5 => "December 7, 2024",
-            _ => ""
-        };
-        
-        selectedItemUpdatedAt = itemId switch
-        {
-            1 => "November 28, 2024",
-            2 => "April 18, 2024",
-            3 => "September 3, 2024",
-            4 => "December 5, 2023",
-            5 => "December 9, 2024",
-            _ => ""
-        };
-    }
-    
-    private void ClosePanel()
-    {
-        isPanelOpen = false;
-    }
-    
-    private void EditItem()
-    {
-        // TODO: Implement edit functionality
-        Console.WriteLine($"Edit item {selectedItemId}");
-    }
-    
-    private void DeleteItem()
-    {
-        // TODO: Implement delete confirmation and functionality
-        Console.WriteLine($"Delete item {selectedItemId}");
-    }
-    
 }
