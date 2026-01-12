@@ -8,6 +8,7 @@ using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
 using PassManAPI.Components;
+using PassManAPI.Services;
 
 public class Program
 {
@@ -28,6 +29,9 @@ public class Program
                 System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename)
             );
         });
+
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
         if (builder.Environment.IsEnvironment("Test"))
