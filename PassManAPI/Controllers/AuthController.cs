@@ -5,6 +5,7 @@ using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
+using Google.Apis.Auth;
 
 namespace PassManAPI.Controllers;
 
@@ -94,6 +95,64 @@ public class AuthController : ControllerBase
 
         var token = $"dev-token-{user.Id}";
         return Ok(new AuthResponse(token, ToProfile(user)));
+    }
+
+    /// <summary>
+    /// Authenticates a user via Google Id Token.
+    /// </summary>
+    [HttpPost("google")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        try
+        {
+            var settings = new GoogleJsonWebSignature.ValidationSettings()
+            {
+               // Audience = new List<string> { "<YOUR_CLIENT_ID>" } // For production security
+            };
+
+            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+            
+            var normalizedEmail = _normalizer.NormalizeEmail(payload.Email) ?? payload.Email.ToUpperInvariant();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
+
+            if (user == null)
+            {
+                // Register new user
+                user = new User
+                {
+                    UserName = payload.Name ?? payload.Email.Split('@')[0],
+                    Email = payload.Email,
+                    NormalizedEmail = normalizedEmail,
+                    NormalizedUserName = payload.Name?.ToUpperInvariant(),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow,
+                    EmailConfirmed = true
+                };
+
+                _db.Users.Add(user);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                user.LastLoginAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+
+            var token = $"dev-token-{user.Id}";
+            return Ok(new AuthResponse(token, ToProfile(user)));
+
+        }
+        catch (InvalidJwtException ex)
+        {
+             return BadRequest($"Invalid Google Token: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+             return BadRequest($"Google Login Failed: {ex.Message}");
+        }
     }
 
     /// <summary>

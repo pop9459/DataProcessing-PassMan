@@ -1,0 +1,62 @@
+@page "/login-check"
+@rendermode InteractiveServer
+@using PassManGUI.Services
+@using PassManGUI.Models
+@inject NavigationManager Navigation
+@inject AuthService AuthService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Validating Login...</PageTitle>
+
+<div class="loading-state">
+    <div class="spinner"></div>
+    <p>Completing secure sign-in...</p>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (string.IsNullOrEmpty(Token))
+            {
+                Navigation.NavigateTo("/login?error=InvalidToken");
+                return;
+            }
+
+            try
+            {
+                // We have the token from the URL (passed by LoginController)
+                // Now we need to store it in the session just like a normal login.
+                // We can't use AuthService.LoginAsync because we already have the token.
+                // We need to manually invoke the storage methods.
+                // Since AuthService private methods are private, we need a public method to "RestoreSession" or "SetSession".
+                // BUT, AuthService has InitializeAsync which reads from storage.
+                // So we need to PUT it into storage first.
+                
+                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "auth_token", Token);
+                
+                // Now we need the user ID. The token isn't a JWT yet (it's "dev-token-123").
+                // So we can extract it.
+                if (Token.StartsWith("dev-token-"))
+                {
+                    var userId = Token.Replace("dev-token-", "");
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "user_id", userId);
+                }
+
+                // Initialize the service to update in-memory state
+                await AuthService.InitializeAsync();
+                
+                Navigation.NavigateTo("/vaults");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing external login: {ex}");
+                Navigation.NavigateTo("/login?error=ProcessingFailed");
+            }
+        }
+    }
+}
