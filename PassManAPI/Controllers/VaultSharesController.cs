@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace PassManAPI.Controllers;
 
 [ApiController]
 [Route("api/vaults/{vaultId}/share")]
+[Authorize]
 public class VaultSharesController : ControllerBase
 {
     /// <summary>

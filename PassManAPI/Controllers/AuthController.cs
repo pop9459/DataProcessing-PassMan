@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -5,35 +6,43 @@ using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
+using PassManAPI.Services;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace PassManAPI.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager _userManager;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly ILookupNormalizer _normalizer;
+    private readonly IJwtTokenService _jwtTokenService;
 
     public AuthController(
         ApplicationDbContext db,
         UserManager userManager,
         IPasswordHasher<User> passwordHasher,
-        ILookupNormalizer normalizer
+        ILookupNormalizer normalizer,
+        IJwtTokenService jwtTokenService
     )
     {
         _db = db;
         _userManager = userManager;
         _passwordHasher = passwordHasher;
         _normalizer = normalizer;
+        _jwtTokenService = jwtTokenService;
     }
 
     /// <summary>
-    /// Registers a new user. Returns a placeholder token until JWT is added.
+    /// Registers a new user and returns a JWT access token.
     /// </summary>
     [HttpPost("register")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -58,15 +67,20 @@ public class AuthController : ControllerBase
             return BadRequest(result.Error ?? "Registration failed.");
         }
 
-        var token = $"dev-token-{result.Data.Id}";
+        var token = _jwtTokenService.CreateAccessToken(
+            result.Data.Id,
+            result.Data.Email,
+            result.Data.UserName
+        );
         var response = new AuthResponse(token, ToProfile(result.Data));
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
 
     /// <summary>
-    /// Authenticates a user and returns a placeholder token.
+    /// Authenticates a user and returns a JWT access token.
     /// </summary>
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -92,21 +106,23 @@ public class AuthController : ControllerBase
         user.LastLoginAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        var token = $"dev-token-{user.Id}";
+        var token = _jwtTokenService.CreateAccessToken(user);
         return Ok(new AuthResponse(token, ToProfile(user)));
     }
 
     /// <summary>
-    /// Returns the current user's profile using a dev-only X-UserId header.
+    /// Returns the current user's profile using JWT claims.
     /// </summary>
     [HttpGet("me")]
     [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetCurrentUser([FromHeader(Name = "X-UserId")] int? userId)
+    public async Task<IActionResult> GetCurrentUser()
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         var result = await _userManager.GetUserByIdAsync(userId.Value);
@@ -126,13 +142,14 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> UpdateProfile(
-        [FromHeader(Name = "X-UserId")] int? userId,
         [FromBody] UpdateProfileRequest request
     )
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         if (!ModelState.IsValid)
@@ -164,11 +181,13 @@ public class AuthController : ControllerBase
     [HttpDelete("me")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> DeleteAccount([FromHeader(Name = "X-UserId")] int? userId)
+    public async Task<IActionResult> DeleteAccount()
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         var result = await _userManager.DeleteUserAsync(userId.Value);
@@ -203,4 +222,18 @@ public class AuthController : ControllerBase
             user.LastLoginAt,
             user.EncryptedVaultKey
         );
+
+    // Reads the authenticated user id from standard JWT claims.
+    private int? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                    User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (claim is null)
+        {
+            return null;
+        }
+
+        return int.TryParse(claim.Value, out var userId) ? userId : null;
+    }
 }

@@ -52,12 +52,12 @@ public class AuthEndpointsTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task GetMe_Returns_Profile_When_Header_Present()
+    public async Task GetMe_Returns_Profile_When_Token_Present()
     {
         var reg = await RegisterAndGet();
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.Add("X-UserId", reg.User.Id.ToString());
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.AccessToken);
         var response = await _client.SendAsync(request);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -75,7 +75,7 @@ public class AuthEndpointsTests : IClassFixture<TestWebApplicationFactory>
         {
             Content = JsonContent.Create(update)
         };
-        request.Headers.Add("X-UserId", reg.User.Id.ToString());
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.AccessToken);
 
         var response = await _client.SendAsync(request);
 
@@ -90,12 +90,12 @@ public class AuthEndpointsTests : IClassFixture<TestWebApplicationFactory>
         var reg = await RegisterAndGet();
 
         var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, "/api/auth/me");
-        deleteRequest.Headers.Add("X-UserId", reg.User.Id.ToString());
+        deleteRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.AccessToken);
         var deleteResponse = await _client.SendAsync(deleteRequest);
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        meRequest.Headers.Add("X-UserId", reg.User.Id.ToString());
+        meRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", reg.AccessToken);
         var meResponse = await _client.SendAsync(meRequest);
         meResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

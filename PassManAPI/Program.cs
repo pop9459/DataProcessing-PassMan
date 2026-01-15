@@ -1,12 +1,17 @@
 namespace PassManAPI;
 
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using PassManAPI.Data;
 using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
+using PassManAPI.Services;
+using System.Text;
 
 public class Program
 {
@@ -24,6 +29,30 @@ public class Program
             options.IncludeXmlComments(
                 System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename)
             );
+            // Enable JWT bearer auth in Swagger UI.
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "Enter: Bearer {token}"
+            });
+            options.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                    },
+                    Array.Empty<string>()
+                }
+            });
         });
 
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
@@ -44,7 +73,36 @@ public class Program
 
         // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
-        
+
+        // JWT configuration + auth setup
+        var jwtSection = builder.Configuration.GetSection("Jwt");
+        builder.Services.Configure<JwtOptions>(jwtSection);
+        var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            // Validate issuer/audience/signature for every request.
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = jwtOptions.Issuer,
+                ValidAudience = jwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(jwtOptions.SigningKey)
+                ),
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+        });
+
+        builder.Services.AddAuthorization();
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
@@ -88,6 +146,7 @@ public class Program
         // Use BCrypt for password hashing and expose lightweight user manager
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
+        builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         var app = builder.Build();
 
