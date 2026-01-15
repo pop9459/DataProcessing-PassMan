@@ -27,8 +27,8 @@ public class CredentialsController : ControllerBase
         // TODO: Replace with actual data retrieval logic here
         var credentials = new[]
         {
-            new { Id = 1, Username = "user1", Password = "pass1" },
-            new { Id = 2, Username = "user2", Password = "pass2" }
+            new { Id = 1, Username = "user1" },
+            new { Id = 2, Username = "user2" }
         };
 
         return Ok(credentials);

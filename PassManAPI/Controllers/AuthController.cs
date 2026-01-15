@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
@@ -17,24 +15,21 @@ namespace PassManAPI.Controllers;
 [Authorize]
 public class AuthController : ControllerBase
 {
-    private readonly ApplicationDbContext _db;
-    private readonly UserManager _userManager;
-    private readonly IPasswordHasher<User> _passwordHasher;
-    private readonly ILookupNormalizer _normalizer;
+    private readonly PassManAPI.Managers.UserManager _userManager;
+    private readonly Microsoft.AspNetCore.Identity.UserManager<User> _identityUserManager;
+    private readonly SignInManager<User> _signInManager;
     private readonly IJwtTokenService _jwtTokenService;
 
     public AuthController(
-        ApplicationDbContext db,
-        UserManager userManager,
-        IPasswordHasher<User> passwordHasher,
-        ILookupNormalizer normalizer,
+        PassManAPI.Managers.UserManager userManager,
+        Microsoft.AspNetCore.Identity.UserManager<User> identityUserManager,
+        SignInManager<User> signInManager,
         IJwtTokenService jwtTokenService
     )
     {
-        _db = db;
         _userManager = userManager;
-        _passwordHasher = passwordHasher;
-        _normalizer = normalizer;
+        _identityUserManager = identityUserManager;
+        _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
     }
 
@@ -90,21 +85,36 @@ public class AuthController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var normalizedEmail = _normalizer.NormalizeEmail(request.Email.Trim()) ?? request.Email.Trim().ToUpperInvariant();
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
-        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
+        var email = request.Email.Trim();
+        var user = await _identityUserManager.FindByEmailAsync(email);
+        if (user is null)
         {
             return Unauthorized("Invalid credentials.");
         }
 
-        var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
-        if (verify == PasswordVerificationResult.Failed)
+        if (!await _identityUserManager.IsEmailConfirmedAsync(user))
+        {
+            return Unauthorized("Email not confirmed.");
+        }
+
+        var signInResult = await _signInManager.CheckPasswordSignInAsync(
+            user,
+            request.Password,
+            lockoutOnFailure: true
+        );
+
+        if (signInResult.IsLockedOut)
+        {
+            return StatusCode(StatusCodes.Status423Locked, "Account is locked. Try again later.");
+        }
+
+        if (!signInResult.Succeeded)
         {
             return Unauthorized("Invalid credentials.");
         }
 
         user.LastLoginAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await _identityUserManager.UpdateAsync(user);
 
         var token = _jwtTokenService.CreateAccessToken(user);
         return Ok(new AuthResponse(token, ToProfile(user)));

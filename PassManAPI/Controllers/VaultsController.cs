@@ -1,9 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace PassManAPI.Controllers;
 
@@ -20,19 +22,21 @@ public class VaultsController : ControllerBase
     }
 
     /// <summary>
-    /// Lists vaults for a given user.
+    /// Lists vaults for the authenticated user.
     /// </summary>
-    /// <param name="userId">Owner user id. If omitted, all vaults are returned (dev-only behavior).</param>
     /// <response code="200">Returns the list of vaults.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<VaultResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<VaultResponse>>> GetVaults([FromQuery] int? userId)
+    public async Task<ActionResult<IEnumerable<VaultResponse>>> GetVaults()
     {
-        var query = _db.Vaults.AsNoTracking();
-        if (userId.HasValue)
+        var userId = GetUserId();
+        if (userId is null)
         {
-            query = query.Where(v => v.UserId == userId.Value);
+            return Unauthorized();
         }
+
+        var query = _db.Vaults.AsNoTracking()
+            .Where(v => v.UserId == userId.Value);
 
         var items = await query
             .OrderBy(v => v.Id)
@@ -52,7 +56,14 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VaultResponse>> GetVault(int id)
     {
-        var vault = await _db.Vaults.AsNoTracking().FirstOrDefaultAsync(v => v.Id == id);
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var vault = await _db.Vaults.AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == id && v.UserId == userId.Value);
         if (vault is null)
         {
             return NotFound();
@@ -71,22 +82,22 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<VaultResponse>> CreateVault([FromBody] CreateVaultRequest request)
     {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
-        }
-
-        var userExists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == request.UserId);
-        if (!userExists)
-        {
-            return BadRequest($"User with id {request.UserId} does not exist.");
         }
 
         var vault = new Vault
         {
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            UserId = request.UserId,
+            UserId = userId.Value,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -109,12 +120,18 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VaultResponse>> UpdateVault(int id, [FromBody] UpdateVaultRequest request)
     {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == id);
+        var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == id && v.UserId == userId.Value);
         if (vault is null)
         {
             return NotFound();
@@ -139,7 +156,13 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVault(int id)
     {
-        var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == id);
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == id && v.UserId == userId.Value);
         if (vault is null)
         {
             return NotFound();
@@ -169,10 +192,6 @@ public class VaultsController : ControllerBase
 
         [StringLength(500)]
         public string? Description { get; set; }
-
-        /// <summary>User id (owner). Replace with auth context once JWT is in place.</summary>
-        [Required]
-        public int UserId { get; set; }
     }
 
     public class UpdateVaultRequest
@@ -193,5 +212,19 @@ public class VaultsController : ControllerBase
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public int UserId { get; set; }
+    }
+
+    // Reads the authenticated user id from standard JWT claims.
+    private int? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                    User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (claim is null)
+        {
+            return null;
+        }
+
+        return int.TryParse(claim.Value, out var userId) ? userId : null;
     }
 }
