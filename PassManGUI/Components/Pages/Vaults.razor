@@ -1,0 +1,192 @@
+@page "/vaults"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject AuthService AuthService
+@inject IApiService ApiService
+@using PassManGUI.Services
+@using PassManGUI.Models
+
+@* 
+    Vaults Page - Main dashboard displaying all user's vaults
+    
+    Status: ✅ Connected to API via ApiService and AuthService
+    
+    TODO:
+    1. Vault Management
+       - Create vault modal/form
+       - Edit vault functionality
+       - Delete vault with confirmation
+       - Share vault with other users
+    
+    2. Search & Filter
+       - Search vaults by name
+       - Filter by date modified, item count
+       - Sort options (name, date, items)
+    
+    3. User Interface
+       - User profile dropdown menu
+       - Settings page navigation
+       - Logout functionality
+*@
+
+<PageTitle>My Vaults - PassMan</PageTitle>
+
+<div class="page-grid">
+    <div class="page-content">
+        <div class="vaults-container">
+            <!-- Header Section -->
+            <div class="vaults-header">
+                <div class="header-content">
+                    <div class="header-left">
+                        <h1>My Vaults</h1>
+                        <p>Manage your secure credential vaults</p>
+                    </div>
+                    <div class="header-right">
+                        <button class="btn-primary" @onclick="CreateVault">+ New Vault</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content Section -->
+            <div class="vaults-content">
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading vaults...</p>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <h2>Failed to load vaults</h2>
+                        <p>@errorMessage</p>
+                        <button class="btn-primary" @onclick="LoadVaults">Try Again</button>
+                    </div>
+                }
+                else if (vaults.Count == 0)
+                {
+                    <!-- Empty State -->
+                    <div class="empty-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <h2>No vaults yet</h2>
+                        <p>Create your first vault to start storing your passwords securely.</p>
+                        <button class="btn-primary" @onclick="CreateVault">Create Your First Vault</button>
+                    </div>
+                }
+                else
+                {
+                    <!-- Vaults Grid -->
+                    <div class="vaults-grid">
+                        @foreach (var vault in vaults)
+                        {
+                            <div class="vault-card" @onclick="() => OpenVault(vault.Id)">
+                                <div class="vault-card-header">
+                                    <h3>@vault.Name</h3>
+                                </div>
+                                @if (!string.IsNullOrEmpty(vault.Description))
+                                {
+                                    <p class="vault-description">@vault.Description</p>
+                                }
+                                <div class="vault-card-footer">
+                                    <span class="last-modified">
+                                        Created @vault.CreatedAt.ToString("MMM dd, yyyy")
+                                        @if (vault.UpdatedAt != default && vault.UpdatedAt != vault.CreatedAt)
+                                        {
+                                            <span> • Updated @vault.UpdatedAt.ToString("MMM dd, yyyy")</span>
+                                        }
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<VaultResponse> vaults = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private bool isAuthenticated = false;
+    private bool hasCheckedAuth = false;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // JS interop is only available after first render
+            var userId = await AuthService.GetUserIdAsync();
+            
+            if (!userId.HasValue)
+            {
+                Console.WriteLine("[Vaults] No userId found, redirecting to login");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            Console.WriteLine($"[Vaults] User authenticated: userId={userId}");
+            isAuthenticated = true;
+            hasCheckedAuth = true;
+            await LoadVaults();
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadVaults()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+            
+            var userId = await AuthService.GetUserIdAsync();
+            if (!userId.HasValue)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            var result = await ApiService.GetVaultsAsync(userId.Value);
+            
+            if (result.Success && result.Data != null)
+            {
+                vaults = result.Data;
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Failed to load vaults.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while loading vaults.";
+            Console.WriteLine($"Load vaults error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void CreateVault()
+    {
+        // TODO: Implement vault creation modal/page
+        Console.WriteLine("Create vault clicked");
+    }
+    
+    private void OpenVault(int vaultId)
+    {
+        Navigation.NavigateTo($"/vault/{vaultId}");
+    }
+}

@@ -1,0 +1,227 @@
+@page "/vault/{VaultId:int}"
+@rendermode InteractiveServer
+@inject AuthService AuthService
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+@using PassManGUI.Services
+@using PassManGUI.Models
+
+@* 
+    Vault Detail Page - Displays items within a specific vault
+    
+    Status: ✅ Connected to API via ApiService and AuthService
+    
+    TODO:
+    1. Implement item actions
+       - Add new item (modal/page)
+       - Edit item (modal/inline)
+       - Delete item (confirmation dialog)
+       - Copy password to clipboard
+       - View password (toggle visibility)
+    
+    2. Add search/filter functionality
+       - Search items by name/username
+       - Filter by category/type
+       - Sort options (name, date, etc.)
+    
+    3. Vault settings
+       - Edit vault name/description
+       - Delete vault
+       - Share vault with users
+       - Export vault data
+*@
+
+<PageTitle>@vaultName - PassMan</PageTitle>
+
+<div class="page-grid">
+    <div class="page-content">
+        <div class="vault-detail-container">
+            <!-- Header -->
+            <div class="vault-detail-header">
+                <div class="header-top">
+                    <a href="/vaults" class="back-link">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Back to Vaults</span>
+                    </a>
+                </div>
+                
+                <div class="header-content">
+                    <div class="header-left">
+                        <div class="vault-info">
+                            <h1>@vaultName</h1>
+                            <p>@vaultDescription</p>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <button class="btn-secondary">Vault Settings</button>
+                        <button class="btn-primary" @onclick="AddItem">+ Add Item</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="vault-detail-content">
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading items...</p>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="error-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <h2>Failed to load items</h2>
+                        <p>@errorMessage</p>
+                        <button class="btn-primary" @onclick="LoadVaultItems">Try Again</button>
+                    </div>
+                }
+                else if (items.Count == 0)
+                {
+                    <div class="empty-state">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                            <path d="M7 10V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V10M5 10H19C20.1046 10 21 10.8954 21 12V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V12C3 10.8954 3.89543 10 5 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <h2>No items yet</h2>
+                        <p>Add your first password or credential to this vault.</p>
+                        <button class="btn-primary" @onclick="AddItem">Add Your First Item</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="items-container">
+                        <p class="items-count">@items.Count items in this vault</p>
+                        <div class="items-list">
+                            @foreach (var item in items)
+                            {
+                                <div class="item-card" @onclick="() => OpenItem(item.Id)">
+                                    <div class="item-card-content">
+                                        <div class="item-header">
+                                            <h3>@item.Name</h3>
+                                            @if (!string.IsNullOrEmpty(item.Label))
+                                            {
+                                                <span class="item-label">@item.Label</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(item.Username))
+                                        {
+                                            <p class="item-username">@item.Username</p>
+                                        }
+                                        @if (!string.IsNullOrEmpty(item.Url))
+                                        {
+                                            <p class="item-url">@item.Url</p>
+                                        }
+                                        <p class="item-created">Created @item.FormatTimeAgo()</p>
+                                    </div>
+                                    <div class="item-card-actions">
+                                        <button type="button" class="icon-btn" title="View details">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int VaultId { get; set; }
+    
+    private string vaultName = "";
+    private string vaultDescription = "";
+    private List<VaultItemModel> items = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private bool isAuthenticated = false;
+    private bool hasCheckedAuth = false;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // JS interop is only available after first render
+            var userId = await AuthService.GetUserIdAsync();
+            
+            if (!userId.HasValue)
+            {
+                Console.WriteLine("[VaultDetail] No userId found, redirecting to login");
+                Navigation.NavigateTo("/login");
+                return;
+            }
+            
+            Console.WriteLine($"[VaultDetail] User authenticated: userId={userId}");
+            isAuthenticated = true;
+            hasCheckedAuth = true;
+            await LoadVaultItems();
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadVaultItems()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+            
+            // Load vault details
+            var vaultResult = await ApiService.GetVaultByIdAsync(VaultId);
+            if (vaultResult.Success && vaultResult.Data != null)
+            {
+                vaultName = vaultResult.Data.Name;
+                vaultDescription = vaultResult.Data.Description ?? "";
+            }
+            else
+            {
+                errorMessage = "Vault not found.";
+                return;
+            }
+            
+            // Load vault items
+            var itemsResult = await ApiService.GetVaultItemsAsync(VaultId);
+            if (itemsResult.Success && itemsResult.Data != null)
+            {
+                items = itemsResult.Data;
+            }
+            else
+            {
+                errorMessage = itemsResult.ErrorMessage ?? "Failed to load items.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred while loading vault items.";
+            Console.WriteLine($"Load vault items error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void AddItem()
+    {
+        // TODO: Implement add item modal/page
+        Console.WriteLine("Add item clicked");
+    }
+    
+    private void OpenItem(int itemId)
+    {
+        // TODO: Implement item detail view/modal
+        Console.WriteLine($"Open item {itemId}");
+    }
+}

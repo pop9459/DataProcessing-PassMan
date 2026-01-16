@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace PassManAPI.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/vaults/{vaultId:int}/credentials")]
 public class CredentialsController : ControllerBase
 {
     /// <summary>
@@ -20,7 +20,6 @@ public class CredentialsController : ControllerBase
     /// <response code="404">If the vault with the specified ID is not found.</response>
     // GET /api/vaults/{vaultId}/credentials
     [HttpGet]
-    [Route("/api/vaults/{vaultId}/credentials")]
     public IActionResult Get(int vaultId)
     {
         // TODO: Replace with actual data retrieval logic here
@@ -49,7 +48,6 @@ public class CredentialsController : ControllerBase
     /// <response code="404">If the vault with the specified ID is not found.</response>
     // POST /api/vaults/{vaultId}/credentials
     [HttpPost]
-    [Route("/api/vaults/{vaultId}/credentials")]
     public IActionResult Post(int vaultId, [FromBody] object credential)
     {
         // TODO: Implement actual data saving logic here
@@ -71,9 +69,8 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to modify the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // PUT /api/credentials/{id}
-    [HttpPut]
-    [Route("{id}")]
-    public IActionResult Put(int id, [FromBody] object credential)
+    [HttpPut("{id:int}")]
+    public IActionResult Put(int vaultId, int id, [FromBody] object credential)
     {
         // TODO: Implement actual data updating logic here
         return Ok("Not implemented");
@@ -91,9 +88,8 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to delete the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // DELETE /api/credentials/{id}
-    [HttpDelete]
-    [Route("{id}")]
-    public IActionResult Delete(int id)
+    [HttpDelete("{id:int}")]
+    public IActionResult Delete(int vaultId, int id)
     {
         // TODO: Implement actual data deletion logic here
         return Ok("Not implemented");

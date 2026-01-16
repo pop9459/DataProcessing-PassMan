@@ -7,8 +7,6 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
-using PassManAPI.Components;
-using PassManAPI.Services;
 
 public class Program
 {
@@ -17,8 +15,6 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents(); // Blazor components
         builder.Services.AddControllers();          // Register MVC controllers
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
@@ -31,7 +27,6 @@ public class Program
         });
 
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
         if (builder.Environment.IsEnvironment("Test"))
@@ -49,8 +44,9 @@ public class Program
             );
         }
 
-        //Add DB Health Service
+        // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
+        
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
@@ -75,6 +71,22 @@ public class Program
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
+        // Configure CORS for frontend
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowFrontend", policy =>
+            {
+                policy.WithOrigins(
+                        "http://localhost:5247",      // PassManGUI Docker port
+                        "http://localhost:5127",      // PassManGUI local dev port
+                        "http://passman-gui:8080"     // Docker internal network
+                      )
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            });
+        });
+        
         // Use BCrypt for password hashing and expose lightweight user manager
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
@@ -125,28 +137,17 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        // Configure the HTTP request pipeline.
-        if (!app.Environment.IsDevelopment())
-        {
-            app.UseExceptionHandler("/Error", createScopeForErrors: true);
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-            app.UseHsts();
-        }
-        app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
         app.UseHttpsRedirection();
+
+        // Enable CORS
+        app.UseCors("AllowFrontend");
 
         // Authentication & Authorization middleware
         app.UseAuthentication();
         app.UseAuthorization();
 
-        app.UseAntiforgery();
-
-        // Map controller routes BEFORE Blazor to prioritize API endpoints
+        // Map controller routes (API only)
         app.MapControllers();
-
-        app.MapStaticAssets();
-        app.MapRazorComponents<App>()
-            .AddInteractiveServerRenderMode();
 
         app.Run();
     }

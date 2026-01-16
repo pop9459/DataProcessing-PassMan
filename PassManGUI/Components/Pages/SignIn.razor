@@ -1,31 +1,24 @@
 @page "/login"
 @rendermode InteractiveServer
+@using PassManGUI.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
 
 @* 
     Authentication Page - User Sign In
     
+    Status: ✅ Connected to API via AuthService
+    
     TODO:
-    1. Add form validation and error handling
-       - Display validation messages for email format
-       - Display validation messages for password requirements
-       - Show error message on failed login attempt
-    
-    2. Implement login API call
-       - Create AuthService to handle authentication
-       - Call POST /api/auth/login endpoint
-       - Handle successful login (store JWT token, redirect to dashboard)
-       - Handle failed login (display error message)
-    
-    3. Implement OAuth authentication
+    1. Implement OAuth authentication
        - Google OAuth flow
        - GitHub OAuth flow
        - X OAuth flow
     
-    4. Add "Remember me" functionality
-       - Store refresh token in secure cookie
-       - Implement token refresh logic
+    2. Add "Remember me" functionality with PIN protection
+       - Implement PIN feature (see AuthService TODO)
     
-    5. Add "Forgot password" flow
+    3. Add "Forgot password" flow
        - Create forgot password page
        - Implement email verification
 *@
@@ -72,17 +65,26 @@
         </div>
 
         <!-- Login Form -->
-        <form class="auth-form" id="loginForm">
-            @* TODO: Add form validation and error handling *@
+        <form class="auth-form" id="loginForm" @onsubmit="HandleLogin" @onsubmit:preventDefault="true">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="error-message">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 10.5a.75.75 0 110 1.5.75.75 0 010-1.5zm.75-7.25a.75.75 0 00-1.5 0v4a.75.75 0 001.5 0v-4z" fill="currentColor"/>
+                    </svg>
+                    @errorMessage
+                </div>
+            }
+            
             <div class="form-group">
                 <label for="email">E-Mail Address</label>
-                <input type="email" id="email" placeholder="Enter your email..." required />
+                <input type="email" id="email" @bind="email" placeholder="Enter your email..." required disabled="@isLoading" />
             </div>
 
             <div class="form-group">
                 <label for="password">Password</label>
                 <div class="password-input">
-                    <input type="@(showPassword ? "text" : "password")" id="password" placeholder="••••••••••" required />
+                    <input type="@(showPassword ? "text" : "password")" id="password" @bind="password" placeholder="••••••••••" required disabled="@isLoading" />
                     <button type="button" class="toggle-password" @onclick="TogglePasswordVisibility" aria-label="Toggle password visibility">
                         <svg class="eye-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" style="opacity: @(showPassword ? "0.5" : "1")">
                             <path d="M10 4C5 4 1.73 7.11 1 10c.73 2.89 4 6 9 6s8.27-3.11 9-6c-.73-2.89-4-6-9-6zm0 10a4 4 0 110-8 4 4 0 010 8zm0-6.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" fill="currentColor"/>
@@ -93,14 +95,22 @@
 
             <div class="form-options">
                 <label class="checkbox-label">
-                    <input type="checkbox" id="remember" />
+                    <input type="checkbox" id="remember" @bind="rememberMe" disabled="@isLoading" />
                     <span>Remember me</span>
                 </label>
                 <a href="#" class="link-text">Forgot password?</a>
             </div>
 
-            @* TODO: Add form submit handler - call HandleLogin() method, validate inputs, make API call *@
-            <button type="submit" class="btn-primary">Sign in</button>
+            <button type="submit" class="btn-primary" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign in</span>
+                }
+            </button>
         </form>
 
         <!-- Sign Up Link -->
@@ -112,10 +122,64 @@
 
 @code {
     private bool showPassword = false;
+    private bool isLoading = false;
+    private bool rememberMe = false;
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string errorMessage = string.Empty;
 
     private void TogglePasswordVisibility()
     {
         showPassword = !showPassword;
     }
-}
 
+    private async Task HandleLogin()
+    {
+        // Clear previous errors
+        errorMessage = string.Empty;
+        
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            errorMessage = "Please enter your email address.";
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Please enter your password.";
+            return;
+        }
+        
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            
+            var result = await AuthService.LoginAsync(email, password);
+            
+            if (result.Success)
+            {
+                // Small delay to ensure sessionStorage is persisted
+                await Task.Delay(100);
+                
+                // TODO: If rememberMe is true, implement PIN feature (see AuthService TODO)
+                Navigation.NavigateTo("/vaults");
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage ?? "Login failed. Please check your credentials.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login. Please try again.";
+            Console.WriteLine($"Login error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
