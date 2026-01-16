@@ -122,10 +122,15 @@ public class Program
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
             await SqlTest.RunAsync(conn);
+        }
 
-            // Seed the database with test data
-            using var seedScope = app.Services.CreateScope();
-            await DbSeeder.SeedAsync(seedScope.ServiceProvider);
+        // Always ensure core roles/permissions exist; seed demo users only in dev.
+        using (var seedScope = app.Services.CreateScope())
+        {
+            await DbSeeder.SeedAsync(
+                seedScope.ServiceProvider,
+                seedDemoUsers: app.Environment.IsDevelopment()
+            );
         }
 
         // Enable swagger UI in development environment

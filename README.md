@@ -105,6 +105,17 @@ Remove-Item -Recurse -Force bin, obj
 -User: root
 -Password: hihi         (intentional leak hihihiha)
 
+## Authorization roles & permissions (API)
+
+The API seeds role-based permissions into MySQL on startup (see `PassManAPI/Data/DbSeeder.cs`). Permissions are stored as Identity role claims with claim type `permission` and follow least-privilege defaults:
+
+- Admin: full access (all permissions).
+- SecurityAuditor: `audit.read`, `vault.read`, `credential.read`, `system.health`.
+- VaultOwner: manage own vaults/credentials (`vault.read/create/update/delete/share`, `credential.read/create/update/delete`).
+- VaultReader: read-only for vault metadata and credentials (`vault.read`, `credential.read`).
+
+In development, demo users are created automatically with the roles above; in other environments only the roles/claims are ensured. Update `PassManAPI/Models/Permissions.cs` to add new permissions, and the seeder will attach them to roles on next startup.
+
 ## Project Structure
 
 The project follows the standard ASP.NET Core Web API structure:
