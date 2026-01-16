@@ -102,6 +102,7 @@ public class UserManager
             NormalizedUserName = normalizedUserName,
             PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
             EncryptedVaultKey = request.EncryptedVaultKey,
+            EmailConfirmed = true,
             CreatedAt = DateTime.UtcNow,
             SecurityStamp = Guid.NewGuid().ToString()
         };

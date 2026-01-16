@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using PassManAPI.Data;
 using PassManAPI.Models;
 using PassManAPI.Controllers;
@@ -29,30 +30,6 @@ public class Program
             options.IncludeXmlComments(
                 System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename)
             );
-            // Enable JWT bearer auth in Swagger UI.
-            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-            {
-                Name = "Authorization",
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                In = ParameterLocation.Header,
-                Description = "Enter: Bearer {token}"
-            });
-            options.AddSecurityRequirement(new OpenApiSecurityRequirement
-            {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
-                    },
-                    Array.Empty<string>()
-                }
-            });
         });
 
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
@@ -74,7 +51,31 @@ public class Program
         // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
 
-        // JWT configuration + auth setup
+        // Add Identity services
+        builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
+        {
+            // Password settings
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+
+            // Lockout settings
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.AllowedForNewUsers = true;
+
+            // User settings
+            options.User.RequireUniqueEmail = true;
+
+            // Sign-in settings
+            options.SignIn.RequireConfirmedEmail = true;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+
+        // JWT configuration + auth setup (after Identity to keep JWT as default)
         var jwtSection = builder.Configuration.GetSection("Jwt");
         builder.Services.Configure<JwtOptions>(jwtSection);
         var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
@@ -103,29 +104,6 @@ public class Program
         });
 
         builder.Services.AddAuthorization();
-        // Add Identity services
-        builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
-        {
-            // Password settings
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-            options.Password.RequiredLength = 8;
-
-            // Lockout settings
-            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-            options.Lockout.MaxFailedAccessAttempts = 5;
-            options.Lockout.AllowedForNewUsers = true;
-
-            // User settings
-            options.User.RequireUniqueEmail = true;
-
-            // Sign-in settings
-            options.SignIn.RequireConfirmedEmail = true;
-        })
-        .AddEntityFrameworkStores<ApplicationDbContext>()
-        .AddDefaultTokenProviders();
 
         // Configure CORS for frontend
         builder.Services.AddCors(options =>
@@ -142,7 +120,7 @@ public class Program
                       .AllowCredentials();
             });
         });
-        
+
         // Use BCrypt for password hashing and expose lightweight user manager
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
@@ -190,6 +168,30 @@ public class Program
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
         {
+            app.Use(async (context, next) =>
+            {
+                if (!context.Request.Path.Equals("/swagger/v1/swagger.json"))
+                {
+                    await next();
+                    return;
+                }
+
+                var originalBody = context.Response.Body;
+                await using var buffer = new MemoryStream();
+                context.Response.Body = buffer;
+
+                await next();
+
+                buffer.Position = 0;
+                using var reader = new StreamReader(buffer);
+                var json = await reader.ReadToEndAsync();
+                var updated = AddJwtSecurityToSwagger(json);
+
+                context.Response.Body = originalBody;
+                context.Response.ContentLength = Encoding.UTF8.GetByteCount(updated);
+                await context.Response.WriteAsync(updated);
+            });
+
             app.UseSwagger();
             app.UseSwaggerUI();
         }
@@ -208,4 +210,37 @@ public class Program
 
         app.Run();
     }
+
+    private static string AddJwtSecurityToSwagger(string json)
+    {
+        var root = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
+
+        var components = root["components"] as JsonObject ?? new JsonObject();
+        var securitySchemes = components["securitySchemes"] as JsonObject ?? new JsonObject();
+
+        securitySchemes["Bearer"] = new JsonObject
+        {
+            ["type"] = "http",
+            ["scheme"] = "bearer",
+            ["bearerFormat"] = "JWT",
+            ["description"] = "Enter: Bearer {token}"
+        };
+
+        components["securitySchemes"] = securitySchemes;
+        root["components"] = components;
+
+        root["security"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["Bearer"] = new JsonArray()
+            }
+        };
+
+        return root.ToJsonString(new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+    }
+
 }
