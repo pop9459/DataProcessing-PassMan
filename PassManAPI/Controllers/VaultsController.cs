@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
-using PassManAPI.Services;
 
 namespace PassManAPI.Controllers;
 
@@ -12,12 +11,10 @@ namespace PassManAPI.Controllers;
 public class VaultsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    private readonly IAuditLogger _auditLogger;
 
-    public VaultsController(ApplicationDbContext db, IAuditLogger auditLogger)
+    public VaultsController(ApplicationDbContext db)
     {
         _db = db;
-        _auditLogger = auditLogger;
     }
 
     /// <summary>
@@ -100,8 +97,6 @@ public class VaultsController : ControllerBase
         _db.Vaults.Add(vault);
         await _db.SaveChangesAsync();
 
-        await _auditLogger.LogAsync(request.UserId, AuditAction.VaultCreated, "Vault", vault.Id, $"Vault created: {vault.Name}");
-
         var response = ToResponse(vault);
         return CreatedAtAction(nameof(GetVault), new { id = vault.Id }, response);
     }
@@ -135,8 +130,6 @@ public class VaultsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        await _auditLogger.LogAsync(vault.UserId, AuditAction.VaultUpdated, "Vault", vault.Id, $"Vault updated: {vault.Name}");
-
         return Ok(ToResponse(vault));
     }
 
@@ -158,7 +151,6 @@ public class VaultsController : ControllerBase
 
         _db.Vaults.Remove(vault);
         await _db.SaveChangesAsync();
-        await _auditLogger.LogAsync(vault.UserId, AuditAction.VaultDeleted, "Vault", vault.Id, $"Vault deleted: {vault.Name}");
         return NoContent();
     }
 
