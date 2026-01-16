@@ -152,6 +152,7 @@ public class Program
                 seedScope.ServiceProvider,
                 seedDemoUsers: app.Environment.IsDevelopment()
             );
+            await DatabaseArtifacts.EnsureAsync(seedScope.ServiceProvider);
         }
 
         // Enable swagger UI in development environment
