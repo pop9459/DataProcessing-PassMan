@@ -97,7 +97,7 @@ public class AuthEndpointsTests : IClassFixture<TestWebApplicationFactory>
         var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         meRequest.Headers.Add("X-UserId", reg.User.Id.ToString());
         var meResponse = await _client.SendAsync(meRequest);
-        meResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        meResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     private static RegisterRequest NewRegister(string email) =>

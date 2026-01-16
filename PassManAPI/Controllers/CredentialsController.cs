@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PassManAPI.Models;
 
 namespace PassManAPI.Controllers;
 
@@ -21,6 +23,7 @@ public class CredentialsController : ControllerBase
     // GET /api/vaults/{vaultId}/credentials
     [HttpGet]
     [Route("/api/vaults/{vaultId}/credentials")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
     public IActionResult Get(int vaultId)
     {
         // TODO: Replace with actual data retrieval logic here
@@ -50,6 +53,7 @@ public class CredentialsController : ControllerBase
     // POST /api/vaults/{vaultId}/credentials
     [HttpPost]
     [Route("/api/vaults/{vaultId}/credentials")]
+    [Authorize(Policy = PermissionConstants.CredentialCreate)]
     public IActionResult Post(int vaultId, [FromBody] object credential)
     {
         // TODO: Implement actual data saving logic here
@@ -73,6 +77,7 @@ public class CredentialsController : ControllerBase
     // PUT /api/credentials/{id}
     [HttpPut]
     [Route("{id}")]
+    [Authorize(Policy = PermissionConstants.CredentialUpdate)]
     public IActionResult Put(int id, [FromBody] object credential)
     {
         // TODO: Implement actual data updating logic here
@@ -93,6 +98,7 @@ public class CredentialsController : ControllerBase
     // DELETE /api/credentials/{id}
     [HttpDelete]
     [Route("{id}")]
+    [Authorize(Policy = PermissionConstants.CredentialDelete)]
     public IActionResult Delete(int id)
     {
         // TODO: Implement actual data deletion logic here

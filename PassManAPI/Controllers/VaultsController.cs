@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
@@ -23,6 +24,7 @@ public class VaultsController : ControllerBase
     /// <param name="userId">Owner user id. If omitted, all vaults are returned (dev-only behavior).</param>
     /// <response code="200">Returns the list of vaults.</response>
     [HttpGet]
+    [Authorize(Policy = PermissionConstants.VaultRead)]
     [ProducesResponseType(typeof(IEnumerable<VaultResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<VaultResponse>>> GetVaults([FromQuery] int? userId)
     {
@@ -46,6 +48,7 @@ public class VaultsController : ControllerBase
     /// <response code="200">Vault found.</response>
     /// <response code="404">Vault not found.</response>
     [HttpGet("{id:int}")]
+    [Authorize(Policy = PermissionConstants.VaultRead)]
     [ProducesResponseType(typeof(VaultResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VaultResponse>> GetVault(int id)
@@ -65,6 +68,7 @@ public class VaultsController : ControllerBase
     /// <response code="201">Vault created.</response>
     /// <response code="400">Invalid payload or unknown user.</response>
     [HttpPost]
+    [Authorize(Policy = PermissionConstants.VaultCreate)]
     [ProducesResponseType(typeof(VaultResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<VaultResponse>> CreateVault([FromBody] CreateVaultRequest request)
@@ -102,6 +106,7 @@ public class VaultsController : ControllerBase
     /// <response code="400">Invalid payload.</response>
     /// <response code="404">Vault not found.</response>
     [HttpPut("{id:int}")]
+    [Authorize(Policy = PermissionConstants.VaultUpdate)]
     [ProducesResponseType(typeof(VaultResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -133,6 +138,7 @@ public class VaultsController : ControllerBase
     /// <response code="204">Vault deleted.</response>
     /// <response code="404">Vault not found.</response>
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = PermissionConstants.VaultDelete)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVault(int id)

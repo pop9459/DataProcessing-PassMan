@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PassManAPI.Models;
 
 namespace PassManAPI.Controllers;
 
@@ -20,6 +22,7 @@ public class VaultSharesController : ControllerBase
     /// <response code="403">If the user does not have permission to share the vault.</response>
     /// <response code="404">If the vault or user is not found.</response>
     [HttpPost]
+    [Authorize(Policy = PermissionConstants.VaultShare)]
     public IActionResult ShareVault(int vaultId, [FromBody] object request)
     {
         // TODO: Implement vault sharing logic
@@ -39,6 +42,7 @@ public class VaultSharesController : ControllerBase
     /// <response code="403">If the user does not have permission to revoke access.</response>
     /// <response code="404">If the vault or user share is not found.</response>
     [HttpDelete("{userId}")]
+    [Authorize(Policy = PermissionConstants.VaultShare)]
     public IActionResult RevokeShare(int vaultId, int userId)
     {
         // TODO: Implement share revocation logic

@@ -1,5 +1,6 @@
 namespace PassManAPI;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
@@ -44,7 +45,7 @@ public class Program
 
         // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
-        
+
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
@@ -68,6 +69,26 @@ public class Program
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // Authentication/Authorization (place after AddIdentity so defaults are not overridden by Identity)
+        builder.Services
+            .AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = DevHeaderAuthenticationHandler.Scheme;
+                options.DefaultChallengeScheme = DevHeaderAuthenticationHandler.Scheme;
+            })
+            .AddScheme<AuthenticationSchemeOptions, DevHeaderAuthenticationHandler>(
+                DevHeaderAuthenticationHandler.Scheme,
+                _ => { });
+
+        builder.Services.AddAuthorization(options =>
+        {
+            foreach (var permission in PermissionConstants.All)
+            {
+                options.AddPolicy(permission, policy =>
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission));
+            }
+        });
 
         // Configure CORS for frontend
         builder.Services.AddCors(options =>
