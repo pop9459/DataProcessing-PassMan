@@ -5,7 +5,6 @@ using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
-using PassManAPI.Services;
 
 namespace PassManAPI.Controllers;
 
@@ -17,21 +16,18 @@ public class AuthController : ControllerBase
     private readonly UserManager _userManager;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly ILookupNormalizer _normalizer;
-    private readonly IAuditLogger _auditLogger;
 
     public AuthController(
         ApplicationDbContext db,
         UserManager userManager,
         IPasswordHasher<User> passwordHasher,
-        ILookupNormalizer normalizer,
-        IAuditLogger auditLogger
+        ILookupNormalizer normalizer
     )
     {
         _db = db;
         _userManager = userManager;
         _passwordHasher = passwordHasher;
         _normalizer = normalizer;
-        _auditLogger = auditLogger;
     }
 
     /// <summary>
@@ -63,7 +59,6 @@ public class AuthController : ControllerBase
         }
 
         var token = $"dev-token-{result.Data.Id}";
-        await _auditLogger.LogAsync(result.Data.Id, AuditAction.UserRegistered, "User", result.Data.Id, "User registered");
         var response = new AuthResponse(token, ToProfile(result.Data));
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
@@ -91,7 +86,6 @@ public class AuthController : ControllerBase
         var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (verify == PasswordVerificationResult.Failed)
         {
-            await _auditLogger.LogAsync(user.Id, AuditAction.FailedLoginAttempt, "User", user.Id, "Invalid password");
             return Unauthorized("Invalid credentials.");
         }
 
@@ -99,7 +93,6 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = $"dev-token-{user.Id}";
-        await _auditLogger.LogAsync(user.Id, AuditAction.UserLoggedIn, "User", user.Id, "User logged in");
         return Ok(new AuthResponse(token, ToProfile(user)));
     }
 
@@ -184,7 +177,6 @@ public class AuthController : ControllerBase
             return NotFound(result.Error ?? "User not found.");
         }
 
-        await _auditLogger.LogAsync(userId.Value, AuditAction.UserDeleted, "User", userId.Value, "Account deleted");
         return NoContent();
     }
 
