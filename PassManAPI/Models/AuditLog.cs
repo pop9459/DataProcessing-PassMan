@@ -10,7 +10,6 @@ namespace PassManAPI.Models
         UserLoggedIn = 101,
         UserLoggedOut = 102,
         UserPasswordChanged = 103,
-        UserDeleted = 104,
 
         // Vault actions
         VaultCreated = 200,
