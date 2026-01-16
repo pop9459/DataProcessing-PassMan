@@ -26,10 +26,16 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<VaultResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<VaultResponse>>> GetVaults([FromQuery] int? userId)
     {
-        var query = _db.Vaults.AsNoTracking();
+        // Include vaults the user owns or that are shared with them
+        var query = _db.Vaults
+            .AsNoTracking()
+            .Include(v => v.SharedUsers)
+            .AsQueryable();
+
         if (userId.HasValue)
         {
-            query = query.Where(v => v.UserId == userId.Value);
+            var uid = userId.Value;
+            query = query.Where(v => v.UserId == uid || v.SharedUsers.Any(su => su.UserId == uid));
         }
 
         var items = await query
