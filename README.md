@@ -6,6 +6,28 @@ This repository contains the source code for the Password Manager API, a project
 
 ## Running the app
 
+### Setting up User Secrets (Required for Development)
+
+The application uses Google OAuth for authentication. Before running the app, you need to configure your Google credentials using .NET User Secrets:
+
+1. Navigate to the PassManGUI project directory:
+    ```bash
+    cd PassManGUI
+    ```
+
+2. Set your Google OAuth credentials:
+    ```bash
+    dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
+    dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
+    ```
+
+3. Verify your secrets are set:
+    ```bash
+    dotnet user-secrets list
+    ```
+
+**Note:** User secrets are stored locally on your machine and are never committed to Git. Each team member needs to set up their own secrets.
+
 ### Docker compose
 1. Clone the repository
     ```
@@ -15,11 +37,12 @@ This repository contains the source code for the Password Manager API, a project
     ```
     cd DataProcessing-PassMan
     ```
-3. Run 
+3. Set up user secrets (see above)
+4. Run 
     ```
     docker compose up -d
     ```
-4. Open http://localhost:5246/
+5. Open http://localhost:5246/
 
 ### Local (dotnet CLI)
 1. Install .NET SDK (9.0 or later).
@@ -31,6 +54,7 @@ This repository contains the source code for the Password Manager API, a project
     ```
     cd DataProcessing-PassMan
     ```
+4. Set up user secrets (see "Setting up User Secrets" section above)
 5. Run the project
     ```
     dotnet run --project PassManAPI
