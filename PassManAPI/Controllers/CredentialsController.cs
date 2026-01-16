@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
 using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace PassManAPI.Controllers;
 
@@ -83,7 +84,7 @@ public class CredentialsController : ControllerBase
     [HttpPost]
     [Route("/api/vaults/{vaultId}/credentials")]
     [Authorize(Policy = PermissionConstants.CredentialCreate)]
-    public async Task<IActionResult> Post(int vaultId, [FromBody] Credential request)
+    public async Task<IActionResult> Post(int vaultId, [FromBody] CreateCredentialRequest request)
     {
         if (!ModelState.IsValid)
         {
@@ -101,13 +102,22 @@ public class CredentialsController : ControllerBase
             return Forbid();
         }
 
-        // Ensure foreign keys align
-        request.VaultId = vaultId;
-        request.CreatedAt = DateTime.UtcNow;
-        _db.Credentials.Add(request);
+        var credential = new Credential
+        {
+            Title = request.Title.Trim(),
+            Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
+            EncryptedPassword = request.EncryptedPassword,
+            Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url.Trim(),
+            Notes = request.Notes,
+            CategoryId = request.CategoryId,
+            VaultId = vaultId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Credentials.Add(credential);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Get), new { vaultId, id = request.Id }, new { request.Id });
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
     }
 
     /// <summary>
@@ -128,7 +138,7 @@ public class CredentialsController : ControllerBase
     [HttpPut]
     [Route("{id}")]
     [Authorize(Policy = PermissionConstants.CredentialUpdate)]
-    public async Task<IActionResult> Put(int id, [FromBody] Credential update)
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateCredentialRequest update)
     {
         if (!ModelState.IsValid)
         {
@@ -152,9 +162,9 @@ public class CredentialsController : ControllerBase
             return Forbid();
         }
 
-        credential.Title = update.Title;
-        credential.Username = update.Username;
-        credential.Url = update.Url;
+        credential.Title = update.Title.Trim();
+        credential.Username = string.IsNullOrWhiteSpace(update.Username) ? null : update.Username.Trim();
+        credential.Url = string.IsNullOrWhiteSpace(update.Url) ? null : update.Url.Trim();
         credential.Notes = update.Notes;
         credential.CategoryId = update.CategoryId;
         credential.UpdatedAt = DateTime.UtcNow;
@@ -219,5 +229,44 @@ public class CredentialsController : ControllerBase
 
         var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
         return isShared;
+    }
+
+    public class CreateCredentialRequest
+    {
+        [Required]
+        [MaxLength(255)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(255)]
+        public string? Username { get; set; }
+
+        [Required]
+        public string EncryptedPassword { get; set; } = string.Empty;
+
+        [MaxLength(500)]
+        [Url]
+        public string? Url { get; set; }
+
+        public string? Notes { get; set; }
+
+        public int? CategoryId { get; set; }
+    }
+
+    public class UpdateCredentialRequest
+    {
+        [Required]
+        [MaxLength(255)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(255)]
+        public string? Username { get; set; }
+
+        [MaxLength(500)]
+        [Url]
+        public string? Url { get; set; }
+
+        public string? Notes { get; set; }
+
+        public int? CategoryId { get; set; }
     }
 }

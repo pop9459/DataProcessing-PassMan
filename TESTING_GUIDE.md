@@ -19,6 +19,7 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
 - AuthEndpointsTests (HTTP): register, login, get profile, update profile, delete account (follow-up GET returns 401 because user is gone).
 - AuthorizationSeedingTests (DI): roles exist; each has exactly its mapped `permission` claims; all role claims use claim type `permission`.
 - AuthorizationPolicyTests (HTTP): VaultOwner allowed to create vault; VaultReader blocked (403) after admin assigns that role; permissions endpoint returns effective permission claims.
+- CredentialsEndpointsTests (HTTP): owner can create/list credentials in own vault; VaultReader (role-assigned) cannot create in a shared vault; enforces permission + owner/share data guards.
 
 ### How to run automated tests
 From repo root:
