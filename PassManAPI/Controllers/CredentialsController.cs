@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PassManAPI.Data;
 using PassManAPI.Models;
+using System.Security.Claims;
 
 namespace PassManAPI.Controllers;
 
@@ -8,6 +11,13 @@ namespace PassManAPI.Controllers;
 [Route("api/[controller]")]
 public class CredentialsController : ControllerBase
 {
+    private readonly ApplicationDbContext _db;
+
+    public CredentialsController(ApplicationDbContext db)
+    {
+        _db = db;
+    }
+
     /// <summary>
     /// Retrieves all credentials stored within a specific vault.
     /// </summary>
@@ -24,16 +34,35 @@ public class CredentialsController : ControllerBase
     [HttpGet]
     [Route("/api/vaults/{vaultId}/credentials")]
     [Authorize(Policy = PermissionConstants.CredentialRead)]
-    public IActionResult Get(int vaultId)
+    public async Task<IActionResult> Get(int vaultId)
     {
-        // TODO: Replace with actual data retrieval logic here
-        var credentials = new[]
+        if (!TryGetCurrentUserId(out var currentUserId))
         {
-            new { Id = 1, Username = "user1", Password = "pass1" },
-            new { Id = 2, Username = "user2", Password = "pass2" }
-        };
+            return Unauthorized();
+        }
 
-        return Ok(credentials);
+        var canAccess = await CanAccessVault(vaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        var items = await _db.Credentials
+            .AsNoTracking()
+            .Where(c => c.VaultId == vaultId)
+            .Select(c => new
+            {
+                c.Id,
+                c.Title,
+                c.Username,
+                c.Url,
+                c.CreatedAt,
+                c.UpdatedAt,
+                c.LastAccessed
+            })
+            .ToListAsync();
+
+        return Ok(items);
     }
 
     /// <summary>
@@ -54,10 +83,31 @@ public class CredentialsController : ControllerBase
     [HttpPost]
     [Route("/api/vaults/{vaultId}/credentials")]
     [Authorize(Policy = PermissionConstants.CredentialCreate)]
-    public IActionResult Post(int vaultId, [FromBody] object credential)
+    public async Task<IActionResult> Post(int vaultId, [FromBody] Credential request)
     {
-        // TODO: Implement actual data saving logic here
-        return Ok("Not implemented");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var canAccess = await CanAccessVault(vaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        // Ensure foreign keys align
+        request.VaultId = vaultId;
+        request.CreatedAt = DateTime.UtcNow;
+        _db.Credentials.Add(request);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(Get), new { vaultId, id = request.Id }, new { request.Id });
     }
 
     /// <summary>
@@ -78,10 +128,39 @@ public class CredentialsController : ControllerBase
     [HttpPut]
     [Route("{id}")]
     [Authorize(Policy = PermissionConstants.CredentialUpdate)]
-    public IActionResult Put(int id, [FromBody] object credential)
+    public async Task<IActionResult> Put(int id, [FromBody] Credential update)
     {
-        // TODO: Implement actual data updating logic here
-        return Ok("Not implemented");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        credential.Title = update.Title;
+        credential.Username = update.Username;
+        credential.Url = update.Url;
+        credential.Notes = update.Notes;
+        credential.CategoryId = update.CategoryId;
+        credential.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     /// <summary>
@@ -99,9 +178,46 @@ public class CredentialsController : ControllerBase
     [HttpDelete]
     [Route("{id}")]
     [Authorize(Policy = PermissionConstants.CredentialDelete)]
-    public IActionResult Delete(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        // TODO: Implement actual data deletion logic here
-        return Ok("Not implemented");
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        _db.Credentials.Remove(credential);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private bool TryGetCurrentUserId(out int userId)
+    {
+        userId = 0;
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return claim != null && int.TryParse(claim.Value, out userId);
+    }
+
+    private async Task<bool> CanAccessVault(int vaultId, int currentUserId)
+    {
+        var isOwner = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId && v.UserId == currentUserId);
+        if (isOwner)
+        {
+            return true;
+        }
+
+        var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
+        return isShared;
     }
 }

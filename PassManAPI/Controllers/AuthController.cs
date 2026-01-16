@@ -8,6 +8,7 @@ using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
 using Google.Apis.Auth;
+using System.Security.Claims;
 
 namespace PassManAPI.Controllers;
 
@@ -330,7 +331,33 @@ public class AuthController : ControllerBase
             return BadRequest($"Failed to assign role: {string.Join(", ", addResult.Errors.Select(e => e.Description))}");
         }
 
+        var actorId = GetCurrentUserId();
+        if (actorId.HasValue)
+        {
+            await LogAuditAsync(AuditAction.UserRoleChanged, actorId.Value, $"Assigned role '{request.Role}' to user {request.UserId}");
+        }
+
         return Ok(new { request.UserId, Role = request.Role });
+    }
+
+    private async Task LogAuditAsync(AuditAction action, int actorUserId, string? details = null)
+    {
+        _db.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            EntityType = "User",
+            EntityId = actorUserId,
+            UserId = actorUserId,
+            Details = details,
+            Timestamp = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    private int? GetCurrentUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return claim != null && int.TryParse(claim.Value, out var id) ? id : null;
     }
 
     private static UserProfileResponse ToProfile(User user) =>
