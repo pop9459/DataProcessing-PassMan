@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
+using PassManAPI.Services;
 
 namespace PassManAPI.Controllers;
 
@@ -13,11 +14,13 @@ public class VaultSharesController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly ILookupNormalizer _normalizer;
+    private readonly IAuditLogger _auditLogger;
 
-    public VaultSharesController(ApplicationDbContext db, ILookupNormalizer normalizer)
+    public VaultSharesController(ApplicationDbContext db, ILookupNormalizer normalizer, IAuditLogger auditLogger)
     {
         _db = db;
         _normalizer = normalizer;
+        _auditLogger = auditLogger;
     }
 
     /// <summary>
@@ -103,6 +106,14 @@ public class VaultSharesController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        await _auditLogger.LogAsync(
+            currentUserId.Value,
+            AuditAction.VaultShared,
+            "VaultShare",
+            vaultId,
+            $"Shared with user {targetUser.Id} as {share.Permission}"
+        );
+
         return Ok(ToResponse(share, targetUser));
     }
 
@@ -152,6 +163,13 @@ public class VaultSharesController : ControllerBase
 
         _db.VaultShares.Remove(share);
         await _db.SaveChangesAsync();
+        await _auditLogger.LogAsync(
+            currentUserId.Value,
+            AuditAction.VaultShareRevoked,
+            "VaultShare",
+            vaultId,
+            $"Revoked user {userId}"
+        );
         return NoContent();
     }
 

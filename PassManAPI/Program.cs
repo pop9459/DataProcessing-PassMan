@@ -26,6 +26,8 @@ public class Program
             );
         });
 
+        builder.Services.AddHttpContextAccessor();
+
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
         if (builder.Environment.IsEnvironment("Test"))
         {
