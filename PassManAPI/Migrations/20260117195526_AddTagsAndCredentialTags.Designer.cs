@@ -12,7 +12,7 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260117151210_AddTagsAndCredentialTags")]
+    [Migration("20260117195526_AddTagsAndCredentialTags")]
     partial class AddTagsAndCredentialTags
     {
         /// <inheritdoc />

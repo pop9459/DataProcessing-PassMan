@@ -29,7 +29,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<User>()
                 .Property(u => u.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Vault configurations
             modelBuilder
@@ -42,7 +42,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Vault>()
                 .Property(v => v.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Credential configurations
             modelBuilder
@@ -62,7 +62,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Credential>()
                 .Property(c => c.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // VaultShare configurations (composite key)
             modelBuilder.Entity<VaultShare>().HasKey(vs => new { vs.VaultId, vs.UserId });
@@ -92,7 +92,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Tag configurations
             modelBuilder

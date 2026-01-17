@@ -327,11 +327,9 @@ namespace PassManAPI.Migrations
             modelBuilder.Entity("PassManAPI.Models.CredentialTag", b =>
                 {
                     b.Property<int>("CredentialId")
-                        .HasColumnType("int")
                         .HasColumnOrder(0);
 
                     b.Property<int>("TagId")
-                        .HasColumnType("int")
                         .HasColumnOrder(1);
 
                     b.HasKey("CredentialId", "TagId");
@@ -344,15 +342,13 @@ namespace PassManAPI.Migrations
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .ValueGeneratedOnAdd();
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasMaxLength(100);
 
                     b.HasKey("Id");
 
