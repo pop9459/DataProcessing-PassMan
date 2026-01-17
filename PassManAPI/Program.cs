@@ -8,6 +8,7 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
+using PassManAPI.Services;
 
 public class Program
 {
@@ -109,6 +110,21 @@ public class Program
         // Use BCrypt for password hashing and expose lightweight user manager
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
+
+        // Register Security Services
+        // JWT Token Service
+        builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+        builder.Services.AddScoped<ITokenService, TokenService>();
+
+        // Password Encryption Service (AES-256-GCM)
+        builder.Services.AddSingleton<IPasswordEncryptionService, PasswordEncryptionService>();
+
+        // Two-Factor Authentication Service (TOTP)
+        builder.Services.AddSingleton<ITwoFactorService, TwoFactorService>();
+
+        // Breach Check Service (Have I Been Pwned)
+        builder.Services.Configure<BreachCheckSettings>(builder.Configuration.GetSection(BreachCheckSettings.SectionName));
+        builder.Services.AddHttpClient<IBreachCheckService, BreachCheckService>();
 
         var app = builder.Build();
 
