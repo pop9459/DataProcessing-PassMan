@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PassManAPI.Data;
 
@@ -11,9 +12,11 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260117201129_AddTagsAndCredentialTags")]
+    partial class AddTagsAndCredentialTags
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -165,9 +168,6 @@ namespace PassManAPI.Migrations
                     b.Property<int>("Action")
                         .HasColumnType("int");
 
-                    b.Property<int?>("CredentialId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Details")
                         .HasColumnType("TEXT");
 
@@ -194,16 +194,9 @@ namespace PassManAPI.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("VaultId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("CredentialId");
-
                     b.HasIndex("UserId");
-
-                    b.HasIndex("VaultId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -572,27 +565,13 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
                 {
-                    b.HasOne("PassManAPI.Models.Credential", "Credential")
-                        .WithMany("AuditLogs")
-                        .HasForeignKey("CredentialId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("PassManAPI.Models.User", "User")
                         .WithMany("AuditLogs")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PassManAPI.Models.Vault", "Vault")
-                        .WithMany("AuditLogs")
-                        .HasForeignKey("VaultId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Credential");
-
                     b.Navigation("User");
-
-                    b.Navigation("Vault");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
@@ -675,8 +654,6 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
                 {
-                    b.Navigation("AuditLogs");
-
                     b.Navigation("CredentialTags");
                 });
 
@@ -696,8 +673,6 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Vault", b =>
                 {
-                    b.Navigation("AuditLogs");
-
                     b.Navigation("Credentials");
 
                     b.Navigation("SharedUsers");

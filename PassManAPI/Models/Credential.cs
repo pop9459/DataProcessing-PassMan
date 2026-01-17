@@ -42,6 +42,13 @@ namespace PassManAPI.Models
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
 
+        // Navigation property for many-to-many relationship with Tags
+        public virtual ICollection<CredentialTag> CredentialTags { get; set; } = new List<CredentialTag>();
+
+        // Navigation property for audit logs linked to this credential
         public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+
+        // TODO: Add when Attachment model is implemented (issue #64)
+        // public virtual ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
     }
 }
