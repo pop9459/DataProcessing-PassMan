@@ -12,7 +12,7 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260117195526_AddTagsAndCredentialTags")]
+    [Migration("20260117201129_AddTagsAndCredentialTags")]
     partial class AddTagsAndCredentialTags
     {
         /// <inheritdoc />
@@ -185,7 +185,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("Timestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("UserAgent")
                         .HasMaxLength(500)
@@ -287,7 +287,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("EncryptedPassword")
                         .IsRequired()
@@ -383,7 +383,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -460,7 +460,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
