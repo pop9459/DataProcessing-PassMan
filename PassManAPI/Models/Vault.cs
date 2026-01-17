@@ -28,5 +28,6 @@ namespace PassManAPI.Models
 
         public virtual ICollection<Credential> Credentials { get; set; } = new List<Credential>();
         public virtual ICollection<VaultShare> SharedUsers { get; set; } = new List<VaultShare>();
+        public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
     }
 }

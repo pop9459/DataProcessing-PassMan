@@ -41,5 +41,7 @@ namespace PassManAPI.Models
 
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
+
+        public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
     }
 }
