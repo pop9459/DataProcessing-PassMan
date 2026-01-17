@@ -22,6 +22,12 @@ public static class PermissionConstants
     public const string CredentialUpdate = "credential.update";
     public const string CredentialDelete = "credential.delete";
 
+    // Tag permissions
+    public const string TagRead = "tag.read";
+    public const string TagCreate = "tag.create";
+    public const string TagUpdate = "tag.update";
+    public const string TagDelete = "tag.delete";
+
     // Audit / admin permissions
     public const string AuditRead = "audit.read";
     public const string UserManage = "user.manage";
@@ -39,6 +45,10 @@ public static class PermissionConstants
         CredentialCreate,
         CredentialUpdate,
         CredentialDelete,
+        TagRead,
+        TagCreate,
+        TagUpdate,
+        TagDelete,
         AuditRead,
         UserManage,
         RoleManage,
@@ -77,7 +87,11 @@ public static class PermissionConstants
                     CredentialRead,
                     CredentialCreate,
                     CredentialUpdate,
-                    CredentialDelete
+                    CredentialDelete,
+                    TagRead,
+                    TagCreate,
+                    TagUpdate,
+                    TagDelete
                 }
             },
             {
@@ -85,7 +99,8 @@ public static class PermissionConstants
                 new[]
                 {
                     VaultRead,
-                    CredentialRead
+                    CredentialRead,
+                    TagRead
                 }
             }
         };

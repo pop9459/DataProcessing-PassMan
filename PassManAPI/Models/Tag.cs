@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PassManAPI.Models
 {
@@ -11,6 +12,14 @@ namespace PassManAPI.Models
         [MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
+        // Foreign key for user ownership (tags are user-scoped)
+        [Required]
+        public int UserId { get; set; }
+
+        // Navigation property for user
+        [ForeignKey("UserId")]
+        public virtual User User { get; set; } = null!;
+
         // Navigation property for many-to-many relationship with Credentials
         public virtual ICollection<CredentialTag> CredentialTags { get; set; } = new List<CredentialTag>();
 
@@ -21,6 +30,13 @@ namespace PassManAPI.Models
         public Tag(string name)
         {
             Name = name;
+        }
+
+        // Constructor with name and userId
+        public Tag(string name, int userId)
+        {
+            Name = name;
+            UserId = userId;
         }
 
         // Rename method (from UML specification)
