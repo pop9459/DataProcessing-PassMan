@@ -29,6 +29,9 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
   - VaultOwner can create vault (allowed).
   - VaultReader cannot create vault (admin assigns role; expect 403).
   - `/api/auth/permissions` returns effective permissions for the user.
+- AuthAssignRoleTests (HTTP):
+  - Admin can assign a role (e.g., VaultReader) to a user.
+  - Permissions endpoint reflects the assigned role (e.g., has `vault.read`, lacks `vault.create`).
 - CredentialsEndpointsTests (HTTP):
   - Owner can create a vault, add a credential, and list it.
   - VaultReader (role-assigned) on a shared vault cannot create credentials (403).
