@@ -28,5 +28,22 @@ namespace PassManAPI.Models
             CredentialId = credentialId;
             TagId = tagId;
         }
+
+        // Add credential to this tag relationship (from UML specification)
+        public void AddCredential(Credential credential)
+        {
+            Credential = credential;
+            CredentialId = credential.Id;
+        }
+
+        // Remove credential from this tag relationship (from UML specification)
+        public void RemoveCredential(Credential credential)
+        {
+            if (CredentialId == credential.Id)
+            {
+                Credential = null!;
+                CredentialId = 0;
+            }
+        }
     }
 }
