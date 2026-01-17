@@ -8,11 +8,10 @@ using System.Security.Claims;
 namespace PassManAPI.Controllers;
 
 [ApiController]
-[Route("api/vaults/{vaultId}/share")]
+[Route("api/vaults/{vaultId:int}/share")]
 public class VaultSharesController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-
     public VaultSharesController(ApplicationDbContext db)
     {
         _db = db;
@@ -72,17 +71,8 @@ public class VaultSharesController : ControllerBase
     }
 
     /// <summary>
-    /// Revokes access to a vault for a user.
+    /// Revoke a user's access to a vault. Admin or owner can revoke.
     /// </summary>
-    /// <remarks>
-    /// Removes a user's access to a specific vault.
-    /// </remarks>
-    /// <param name="vaultId">The unique identifier of the vault.</param>
-    /// <param name="userId">The unique identifier of the user to remove.</param>
-    /// <response code="204">If the access is revoked successfully.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user does not have permission to revoke access.</response>
-    /// <response code="404">If the vault or user share is not found.</response>
     [HttpDelete("{userId}")]
     [Authorize(Policy = PermissionConstants.VaultShare)]
     public async Task<IActionResult> RevokeShare(int vaultId, int userId)

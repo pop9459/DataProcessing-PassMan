@@ -9,7 +9,7 @@ using System.ComponentModel.DataAnnotations;
 namespace PassManAPI.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/vaults/{vaultId:int}/credentials")]
 public class CredentialsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -135,8 +135,7 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to modify the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // PUT /api/credentials/{id}
-    [HttpPut]
-    [Route("{id}")]
+    [HttpPut("/api/credentials/{id:int}")]
     [Authorize(Policy = PermissionConstants.CredentialUpdate)]
     public async Task<IActionResult> Put(int id, [FromBody] UpdateCredentialRequest update)
     {
@@ -185,8 +184,7 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to delete the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // DELETE /api/credentials/{id}
-    [HttpDelete]
-    [Route("{id}")]
+    [HttpDelete("/api/credentials/{id:int}")]
     [Authorize(Policy = PermissionConstants.CredentialDelete)]
     public async Task<IActionResult> Delete(int id)
     {

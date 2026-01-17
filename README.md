@@ -6,29 +6,24 @@ This repository contains the source code for the Password Manager API, a project
 
 ## Running the app
 
-### Setting up User Secrets (Required for Development)
+### Setting up Environment Variables (Required for Development)
 
-The application uses Google OAuth for authentication. Before running the app, you need to configure your Google credentials using .NET User Secrets:
+The application uses Google OAuth for authentication. Before running the app, you need to configure your Google credentials:
 
-1. Navigate to the PassManGUI project directory:
+1. Create a `.env` file in the repository root:
     ```bash
-    cd PassManGUI
+    cp .env.example .env
     ```
 
-2. Set your Google OAuth credentials:
-    ```bash
-    dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
-    dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
+2. Edit the `.env` file and add your Google OAuth credentials:
+    ```
+    GOOGLE_CLIENT_ID=your-google-client-id
+    GOOGLE_CLIENT_SECRET=your-google-client-secret
     ```
 
-3. Verify your secrets are set:
-    ```bash
-    dotnet user-secrets list
-    ```
+**Note:** The `.env` file is gitignored and never committed to Git. Each team member needs to set up their own `.env` file.
 
-**Note:** User secrets are stored locally on your machine and are never committed to Git. Each team member needs to set up their own secrets.
-
-### Docker compose
+### Docker compose (Recommended)
 1. Clone the repository
     ```
     git clone https://github.com/pop9459/DataProcessing-PassMan
@@ -37,12 +32,12 @@ The application uses Google OAuth for authentication. Before running the app, yo
     ```
     cd DataProcessing-PassMan
     ```
-3. Set up user secrets (see above)
+3. Set up environment variables (see above)
 4. Run 
     ```
     docker compose up -d
     ```
-5. Open http://localhost:5246/
+5. Open http://localhost:5247/ (GUI) or http://localhost:5246/ (API)
 
 ### Local (dotnet CLI)
 1. Install .NET SDK (9.0 or later).
@@ -54,12 +49,27 @@ The application uses Google OAuth for authentication. Before running the app, yo
     ```
     cd DataProcessing-PassMan
     ```
-4. Set up user secrets (see "Setting up User Secrets" section above)
-5. Run the project
+4. Set up environment variables (see "Setting up Environment Variables" section above)
+5. Install dotnet user secrets globally if not already installed:
+    ```
+    dotnet tool install -g dotnet-user-secrets
+    ```
+6. Set your local user secrets:
+    ```
+    cd PassManGUI
+    dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
+    dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
+    cd ..
+    ```
+7. Run the projects
     ```
     dotnet run --project PassManAPI
     ``` 
-6. Open http://localhost:5246/
+8. In another terminal, run:
+    ```
+    dotnet run --project PassManGUI
+    ```
+9. Open http://localhost:5247/ (GUI)
 
 ### Troubleshooting
 
