@@ -115,6 +115,27 @@ Remove-Item -Recurse -Force bin, obj
 -User: root
 -Password: hihi         (intentional leak hihihiha)
 
+## Authorization roles & permissions (API)
+
+The API seeds role-based permissions into MySQL on startup (see `PassManAPI/Data/DbSeeder.cs`). Permissions are stored as Identity role claims with claim type `permission` and follow least-privilege defaults:
+
+- Admin: full access (all permissions).
+- SecurityAuditor: `audit.read`, `vault.read`, `credential.read`, `system.health`.
+- VaultOwner: manage own vaults/credentials (`vault.read/create/update/delete/share`, `credential.read/create/update/delete`).
+- VaultReader: read-only for vault metadata and credentials (`vault.read`, `credential.read`).
+
+In development, demo users are created automatically with the roles above; in other environments only the roles/claims are ensured. Update `PassManAPI/Models/Permissions.cs` to add new permissions, and the seeder will attach them to roles on next startup.
+
+## Database artifacts & isolation (value and justification)
+
+- Constraints: PK/FK/unique and length/null constraints are defined in the EF model/migrations (e.g., unique Users.Email, composite key on VaultShares, cascading deletes where appropriate) to maintain referential integrity.
+- View: `vwUserVaultAccess` lists vaults a user can access (owner or shared) to support least-privilege querying without exposing sensitive fields.
+- Stored procedures:
+  - `sp_AddVaultShare`: validated, idempotent share creation by email (guards missing vault/user and ignores duplicates).
+  - `sp_LogAudit`: centralized insert into AuditLogs for privileged actions.
+- Trigger: `trg_Credentials_SetUpdatedAt` maintains UpdatedAt on credential updates for auditability.
+- Isolation: when running on MySQL, we set session isolation to `READ COMMITTED` during artifact setup to reduce phantom-read risk for high-churn operations while avoiding excessive locking; SQLite/test bypasses these artifacts.
+
 ## Project Structure
 
 The project follows the standard ASP.NET Core Web API structure:

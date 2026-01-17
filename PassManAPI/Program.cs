@@ -1,5 +1,6 @@
 namespace PassManAPI;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
@@ -44,7 +45,7 @@ public class Program
 
         // Add DB Health Service
         builder.Services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
-        
+
         // Add Identity services
         builder.Services.AddIdentity<User, IdentityRole<int>>(options =>
         {
@@ -68,6 +69,26 @@ public class Program
         })
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
+
+        // Authentication/Authorization (place after AddIdentity so defaults are not overridden by Identity)
+        builder.Services
+            .AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = DevHeaderAuthenticationHandler.Scheme;
+                options.DefaultChallengeScheme = DevHeaderAuthenticationHandler.Scheme;
+            })
+            .AddScheme<AuthenticationSchemeOptions, DevHeaderAuthenticationHandler>(
+                DevHeaderAuthenticationHandler.Scheme,
+                _ => { });
+
+        builder.Services.AddAuthorization(options =>
+        {
+            foreach (var permission in PermissionConstants.All)
+            {
+                options.AddPolicy(permission, policy =>
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission));
+            }
+        });
 
         // Configure CORS for frontend
         builder.Services.AddCors(options =>
@@ -122,10 +143,16 @@ public class Program
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
             await SqlTest.RunAsync(conn);
+        }
 
-            // Seed the database with test data
-            using var seedScope = app.Services.CreateScope();
-            await DbSeeder.SeedAsync(seedScope.ServiceProvider);
+        // Always ensure core roles/permissions exist; seed demo users only in dev.
+        using (var seedScope = app.Services.CreateScope())
+        {
+            await DbSeeder.SeedAsync(
+                seedScope.ServiceProvider,
+                seedDemoUsers: app.Environment.IsDevelopment()
+            );
+            await DatabaseArtifacts.EnsureAsync(seedScope.ServiceProvider);
         }
 
         // Enable swagger UI in development environment

@@ -1,4 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PassManAPI.Data;
+using PassManAPI.Models;
+using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace PassManAPI.Controllers;
 
@@ -6,6 +12,13 @@ namespace PassManAPI.Controllers;
 [Route("api/vaults/{vaultId:int}/credentials")]
 public class CredentialsController : ControllerBase
 {
+    private readonly ApplicationDbContext _db;
+
+    public CredentialsController(ApplicationDbContext db)
+    {
+        _db = db;
+    }
+
     /// <summary>
     /// Retrieves all credentials stored within a specific vault.
     /// </summary>
@@ -20,16 +33,37 @@ public class CredentialsController : ControllerBase
     /// <response code="404">If the vault with the specified ID is not found.</response>
     // GET /api/vaults/{vaultId}/credentials
     [HttpGet]
-    public IActionResult Get(int vaultId)
+    [Route("/api/vaults/{vaultId}/credentials")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
+    public async Task<IActionResult> Get(int vaultId)
     {
-        // TODO: Replace with actual data retrieval logic here
-        var credentials = new[]
+        if (!TryGetCurrentUserId(out var currentUserId))
         {
-            new { Id = 1, Username = "user1", Password = "pass1" },
-            new { Id = 2, Username = "user2", Password = "pass2" }
-        };
+            return Unauthorized();
+        }
 
-        return Ok(credentials);
+        var canAccess = await CanAccessVault(vaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        var items = await _db.Credentials
+            .AsNoTracking()
+            .Where(c => c.VaultId == vaultId)
+            .Select(c => new
+            {
+                c.Id,
+                c.Title,
+                c.Username,
+                c.Url,
+                c.CreatedAt,
+                c.UpdatedAt,
+                c.LastAccessed
+            })
+            .ToListAsync();
+
+        return Ok(items);
     }
 
     /// <summary>
@@ -48,10 +82,42 @@ public class CredentialsController : ControllerBase
     /// <response code="404">If the vault with the specified ID is not found.</response>
     // POST /api/vaults/{vaultId}/credentials
     [HttpPost]
-    public IActionResult Post(int vaultId, [FromBody] object credential)
+    [Route("/api/vaults/{vaultId}/credentials")]
+    [Authorize(Policy = PermissionConstants.CredentialCreate)]
+    public async Task<IActionResult> Post(int vaultId, [FromBody] CreateCredentialRequest request)
     {
-        // TODO: Implement actual data saving logic here
-        return Ok("Not implemented");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var canAccess = await CanAccessVault(vaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        var credential = new Credential
+        {
+            Title = request.Title.Trim(),
+            Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
+            EncryptedPassword = request.EncryptedPassword,
+            Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url.Trim(),
+            Notes = request.Notes,
+            CategoryId = request.CategoryId,
+            VaultId = vaultId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Credentials.Add(credential);
+        await _db.SaveChangesAsync();
+
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
     }
 
     /// <summary>
@@ -69,11 +135,41 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to modify the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // PUT /api/credentials/{id}
-    [HttpPut("{id:int}")]
-    public IActionResult Put(int vaultId, int id, [FromBody] object credential)
+    [HttpPut("/api/credentials/{id:int}")]
+    [Authorize(Policy = PermissionConstants.CredentialUpdate)]
+    public async Task<IActionResult> Put(int id, [FromBody] UpdateCredentialRequest update)
     {
-        // TODO: Implement actual data updating logic here
-        return Ok("Not implemented");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        credential.Title = update.Title.Trim();
+        credential.Username = string.IsNullOrWhiteSpace(update.Username) ? null : update.Username.Trim();
+        credential.Url = string.IsNullOrWhiteSpace(update.Url) ? null : update.Url.Trim();
+        credential.Notes = update.Notes;
+        credential.CategoryId = update.CategoryId;
+        credential.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     /// <summary>
@@ -88,10 +184,87 @@ public class CredentialsController : ControllerBase
     /// <response code="403">If the user does not have permission to delete the credential.</response>
     /// <response code="404">If the credential with the specified ID is not found.</response>
     // DELETE /api/credentials/{id}
-    [HttpDelete("{id:int}")]
-    public IActionResult Delete(int vaultId, int id)
+    [HttpDelete("/api/credentials/{id:int}")]
+    [Authorize(Policy = PermissionConstants.CredentialDelete)]
+    public async Task<IActionResult> Delete(int id)
     {
-        // TODO: Implement actual data deletion logic here
-        return Ok("Not implemented");
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        _db.Credentials.Remove(credential);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    private bool TryGetCurrentUserId(out int userId)
+    {
+        userId = 0;
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        return claim != null && int.TryParse(claim.Value, out userId);
+    }
+
+    private async Task<bool> CanAccessVault(int vaultId, int currentUserId)
+    {
+        var isOwner = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId && v.UserId == currentUserId);
+        if (isOwner)
+        {
+            return true;
+        }
+
+        var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
+        return isShared;
+    }
+
+    public class CreateCredentialRequest
+    {
+        [Required]
+        [MaxLength(255)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(255)]
+        public string? Username { get; set; }
+
+        [Required]
+        public string EncryptedPassword { get; set; } = string.Empty;
+
+        [MaxLength(500)]
+        [Url]
+        public string? Url { get; set; }
+
+        public string? Notes { get; set; }
+
+        public int? CategoryId { get; set; }
+    }
+
+    public class UpdateCredentialRequest
+    {
+        [Required]
+        [MaxLength(255)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(255)]
+        public string? Username { get; set; }
+
+        [MaxLength(500)]
+        [Url]
+        public string? Url { get; set; }
+
+        public string? Notes { get; set; }
+
+        public int? CategoryId { get; set; }
     }
 }
