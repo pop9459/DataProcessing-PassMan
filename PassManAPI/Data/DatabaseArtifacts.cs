@@ -59,11 +59,9 @@ BEGIN
     IF vUserId IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User not found';
     END IF;
-    IF vOwnerId = vUserId THEN
-        LEAVE proc_end;
+    IF vOwnerId <> vUserId THEN
+        INSERT IGNORE INTO VaultShares (VaultId, UserId) VALUES (pVaultId, vUserId);
     END IF;
-    INSERT IGNORE INTO VaultShares (VaultId, UserId) VALUES (pVaultId, vUserId);
-    proc_end: BEGIN END;
 END;";
             await ExecuteAsync(conn, tx, dropSpShare);
             await ExecuteAsync(conn, tx, createSpShare);
