@@ -127,6 +127,79 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
         credResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Owner_Can_Update_And_Delete_Credential()
+    {
+        var user = await RegisterAsync("cred-owner-update@test.local");
+
+        // Create vault
+        var vault = new
+        {
+            name = "Owner Vault",
+            description = "owner vault",
+            userId = user.User.Id
+        };
+        var vaultRequest = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(vault)
+        };
+        vaultRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultResponse = await _client.SendAsync(vaultRequest);
+        vaultResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vaultPayload = await vaultResponse.Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        // Create credential
+        var cred = new
+        {
+            Title = "Email",
+            Username = "alice",
+            EncryptedPassword = "enc-pass",
+            Url = "https://mail.test",
+            Notes = "test note",
+            CategoryId = (int?)null
+        };
+        var credRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultPayload!.Id}/credentials")
+        {
+            Content = JsonContent.Create(cred)
+        };
+        credRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credResponse = await _client.SendAsync(credRequest);
+        credResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await credResponse.Content.ReadFromJsonAsync<IdResponse>();
+
+        // Update credential
+        var update = new
+        {
+            Title = "Email-updated",
+            Username = "alice2",
+            Url = "https://mail.updated",
+            Notes = "updated note",
+            CategoryId = (int?)null
+        };
+        var updateReq = new HttpRequestMessage(HttpMethod.Put, $"/api/credentials/{created!.Id}")
+        {
+            Content = JsonContent.Create(update)
+        };
+        updateReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var updateResp = await _client.SendAsync(updateReq);
+        updateResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Delete credential
+        var delReq = new HttpRequestMessage(HttpMethod.Delete, $"/api/credentials/{created.Id}");
+        delReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var delResp = await _client.SendAsync(delReq);
+        delResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Confirm not found
+        var listReq = new HttpRequestMessage(HttpMethod.Get, $"/api/vaults/{vaultPayload.Id}/credentials");
+        listReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var listResp = await _client.SendAsync(listReq);
+        listResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var items = await listResp.Content.ReadFromJsonAsync<List<CredentialListItem>>();
+        items.Should().NotBeNull();
+        items!.Should().NotContain(i => i.Id == created.Id);
+    }
+
     private async Task<AuthResponse> LoginAsync(string email, string password)
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
@@ -167,5 +240,7 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
         DateTime? UpdatedAt,
         DateTime? LastAccessed
     );
+
+    private record IdResponse(int Id);
 }
 

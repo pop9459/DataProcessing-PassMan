@@ -33,7 +33,7 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
   - Admin can assign a role (e.g., VaultReader) to a user.
   - Permissions endpoint reflects the assigned role (e.g., has `vault.read`, lacks `vault.create`).
 - CredentialsEndpointsTests (HTTP):
-  - Owner can create a vault, add a credential, and list it.
+  - Owner can create a vault, add a credential, list it, update it, and delete it.
   - VaultReader (role-assigned) on a shared vault cannot create credentials (403).
 - VaultEndpointsTests (HTTP):
   - Owner can create/list/get/delete own vault; delete makes get return 404.
