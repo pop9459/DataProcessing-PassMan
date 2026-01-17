@@ -6,7 +6,24 @@ This repository contains the source code for the Password Manager API, a project
 
 ## Running the app
 
-### Docker compose
+### Setting up Environment Variables (Required for Development)
+
+The application uses Google OAuth for authentication. Before running the app, you need to configure your Google credentials:
+
+1. Create a `.env` file in the repository root:
+    ```bash
+    cp .env.example .env
+    ```
+
+2. Edit the `.env` file and add your Google OAuth credentials:
+    ```
+    GOOGLE_CLIENT_ID=your-google-client-id
+    GOOGLE_CLIENT_SECRET=your-google-client-secret
+    ```
+
+**Note:** The `.env` file is gitignored and never committed to Git. Each team member needs to set up their own `.env` file.
+
+### Docker compose (Recommended)
 1. Clone the repository
     ```
     git clone https://github.com/pop9459/DataProcessing-PassMan
@@ -15,11 +32,12 @@ This repository contains the source code for the Password Manager API, a project
     ```
     cd DataProcessing-PassMan
     ```
-3. Run 
+3. Set up environment variables (see above)
+4. Run 
     ```
     docker compose up -d
     ```
-4. Open http://localhost:5246/
+5. Open http://localhost:5247/ (GUI) or http://localhost:5246/ (API)
 
 ### Local (dotnet CLI)
 1. Install .NET SDK (9.0 or later).
@@ -31,11 +49,27 @@ This repository contains the source code for the Password Manager API, a project
     ```
     cd DataProcessing-PassMan
     ```
-5. Run the project
+4. Set up environment variables (see "Setting up Environment Variables" section above)
+5. Install dotnet user secrets globally if not already installed:
+    ```
+    dotnet tool install -g dotnet-user-secrets
+    ```
+6. Set your local user secrets:
+    ```
+    cd PassManGUI
+    dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
+    dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
+    cd ..
+    ```
+7. Run the projects
     ```
     dotnet run --project PassManAPI
     ``` 
-6. Open http://localhost:5246/
+8. In another terminal, run:
+    ```
+    dotnet run --project PassManGUI
+    ```
+9. Open http://localhost:5247/ (GUI)
 
 ### Troubleshooting
 

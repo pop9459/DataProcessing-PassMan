@@ -27,6 +27,8 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - ApiBaseUrl=http://passman-api:8080
+      - Authentication__Google__ClientId=${GOOGLE_CLIENT_ID}
+      - Authentication__Google__ClientSecret=${GOOGLE_CLIENT_SECRET}
     volumes:
       - ./PassManGUI:/app
     depends_on:
