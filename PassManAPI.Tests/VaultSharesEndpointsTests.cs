@@ -94,6 +94,69 @@ public class VaultSharesEndpointsTests : IClassFixture<TestWebApplicationFactory
         shareResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Shared_User_Cannot_Revoke()
+    {
+        var owner = await RegisterAsync("share-owner4@test.local");
+        var shared = await RegisterAsync("share-shared4@test.local");
+        var target = await RegisterAsync("share-target4@test.local");
+
+        // Create vault
+        var create = new { name = "Revokable Vault", description = "revokable", userId = owner.User.Id };
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(create)
+        };
+        createReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var createResp = await _client.SendAsync(createReq);
+        createResp.EnsureSuccessStatusCode();
+        var vault = await createResp.Content.ReadFromJsonAsync<VaultResponse>();
+
+        // Owner shares to both users
+        foreach (var email in new[] { shared.User.Email, target.User.Email })
+        {
+            var shareReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/share")
+            {
+                Content = JsonContent.Create(new { userEmail = email })
+            };
+            shareReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+            var shareResp = await _client.SendAsync(shareReq);
+            shareResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        // Shared user tries to revoke target -> forbidden
+        var revokeReq = new HttpRequestMessage(HttpMethod.Delete, $"/api/vaults/{vault!.Id}/share/{target.User.Id}");
+        revokeReq.Headers.Add("X-UserId", shared.User.Id.ToString());
+        var revokeResp = await _client.SendAsync(revokeReq);
+        revokeResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Share_To_Nonexistent_User_Returns_NotFound()
+    {
+        var owner = await RegisterAsync("share-owner5@test.local");
+
+        // Create vault
+        var create = new { name = "Missing User Vault", description = "missing user", userId = owner.User.Id };
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(create)
+        };
+        createReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var createResp = await _client.SendAsync(createReq);
+        createResp.EnsureSuccessStatusCode();
+        var vault = await createResp.Content.ReadFromJsonAsync<VaultResponse>();
+
+        // Share to nonexistent email
+        var shareReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/share")
+        {
+            Content = JsonContent.Create(new { userEmail = "doesnotexist@test.local" })
+        };
+        shareReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var shareResp = await _client.SendAsync(shareReq);
+        shareResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private async Task<AuthResponse> RegisterAsync(string email)
     {
         var request = new RegisterRequest

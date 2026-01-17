@@ -42,6 +42,8 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
   - Owner can share a vault; shared user sees it.
   - Owner can revoke; shared user no longer sees it.
   - Non-owner cannot share (403).
+  - Shared user cannot revoke (403).
+  - Sharing to a nonexistent user returns 404.
 
 ### How to run automated tests
 From repo root:
