@@ -41,5 +41,8 @@ namespace PassManAPI.Models
 
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
+
+        // Navigation property for many-to-many relationship with Tags
+        public virtual ICollection<CredentialTag> CredentialTags { get; set; } = new List<CredentialTag>();
     }
 }
