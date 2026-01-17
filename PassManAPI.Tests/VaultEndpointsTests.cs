@@ -118,6 +118,36 @@ public class VaultEndpointsTests : IClassFixture<TestWebApplicationFactory>
         delResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Owner_Can_Update_Vault()
+    {
+        var owner = await RegisterAsync("vault-owner-update@test.local");
+
+        // Create
+        var create = new { name = "Owner Vault", description = "owner vault", userId = owner.User.Id };
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(create)
+        };
+        createReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var createResp = await _client.SendAsync(createReq);
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vault = await createResp.Content.ReadFromJsonAsync<VaultResponse>();
+
+        // Update
+        var update = new { name = "Updated Vault", description = "updated desc" };
+        var updateReq = new HttpRequestMessage(HttpMethod.Put, $"/api/vaults/{vault!.Id}")
+        {
+            Content = JsonContent.Create(update)
+        };
+        updateReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var updateResp = await _client.SendAsync(updateReq);
+        updateResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await updateResp.Content.ReadFromJsonAsync<VaultResponse>();
+        updated!.Name.Should().Be("Updated Vault");
+        updated.Description.Should().Be("updated desc");
+    }
+
     private async Task<AuthResponse> RegisterAsync(string email)
     {
         var request = new RegisterRequest

@@ -36,7 +36,7 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
   - Owner can create a vault, add a credential, list it, update it, and delete it.
   - VaultReader (role-assigned) on a shared vault cannot create credentials (403).
 - VaultEndpointsTests (HTTP):
-  - Owner can create/list/get/delete own vault; delete makes get return 404.
+  - Owner can create/list/get/update/delete own vault; delete makes get return 404.
   - Shared user (via share) can list/get shared vault but cannot update/delete (403).
 - VaultSharesEndpointsTests (HTTP):
   - Owner can share a vault; shared user sees it.
