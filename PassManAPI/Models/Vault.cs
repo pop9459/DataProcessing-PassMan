@@ -15,6 +15,17 @@ namespace PassManAPI.Models
         [MaxLength(500)]
         public string? Description { get; set; }
 
+        /// <summary>
+        /// Optional icon/emoji for the vault
+        /// </summary>
+        [MaxLength(50)]
+        public string? Icon { get; set; }
+
+        /// <summary>
+        /// Soft delete flag - when true, vault is considered deleted
+        /// </summary>
+        public bool IsDeleted { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 
@@ -28,5 +39,8 @@ namespace PassManAPI.Models
 
         public virtual ICollection<Credential> Credentials { get; set; } = new List<Credential>();
         public virtual ICollection<VaultShare> SharedUsers { get; set; } = new List<VaultShare>();
+
+        // TODO: Add Invitations navigation property when Invitation model is implemented
+        // public virtual ICollection<Invitation> Invitations { get; set; } = new List<Invitation>();
     }
 }

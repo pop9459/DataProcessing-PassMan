@@ -42,6 +42,11 @@ namespace PassManAPI.Data
                 .Property(v => v.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+            // Global query filter for soft delete
+            modelBuilder
+                .Entity<Vault>()
+                .HasQueryFilter(v => !v.IsDeleted);
+
             // Credential configurations
             modelBuilder
                 .Entity<Credential>()
