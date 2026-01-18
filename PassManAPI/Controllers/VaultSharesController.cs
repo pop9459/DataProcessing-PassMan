@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
+using PassManAPI.DTOs;
 using PassManAPI.Models;
 using System.Security.Claims;
 
@@ -67,7 +68,7 @@ public class VaultSharesController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
-        return Ok(new { vaultId, targetUser = targetUser.Email });
+        return Ok(new VaultShareResponse { VaultId = vaultId, TargetUser = targetUser.Email! });
     }
 
     /// <summary>

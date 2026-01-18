@@ -67,7 +67,11 @@ public record UserProfileResponse(
     DateTime? LastLoginAt,
     string? EncryptedVaultKey,
     Guid? SubscriptionTierId
-);
+)
+{
+    // Parameterless constructor for XML serialization
+    public UserProfileResponse() : this(0, string.Empty, null, null, DateTime.MinValue, null, null, null, null) { }
+}
 
 /// <summary>
 /// Authentication response payload; accessToken is a placeholder until JWT is added.
@@ -75,5 +79,9 @@ public record UserProfileResponse(
 public record AuthResponse(
     string AccessToken,
     UserProfileResponse User
-);
+)
+{
+    // Parameterless constructor for XML serialization
+    public AuthResponse() : this(string.Empty, new UserProfileResponse()) { }
+};
 

@@ -26,7 +26,8 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        builder.Services.AddControllers();          // Register MVC controllers
+        builder.Services.AddControllers()           // Register MVC controllers
+            .AddXmlSerializerFormatters();          // Enable XML serialization support
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
         {
