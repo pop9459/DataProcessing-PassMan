@@ -44,7 +44,7 @@ public class TagsController : ControllerBase
             .AsNoTracking()
             .Where(t => t.UserId == currentUserId)
             .OrderBy(t => t.Name)
-            .Select(t => new TagDto { Id = t.Id, Name = t.Name })
+            .Select(t => new TagDto(t.Id, t.Name))
             .ToListAsync();
 
         return Ok(tags);
@@ -82,7 +82,7 @@ public class TagsController : ControllerBase
             return Forbid();
         }
 
-        return Ok(new TagDto { Id = tag.Id, Name = tag.Name });
+        return Ok(new TagDto(tag.Id, tag.Name));
     }
 
     /// <summary>
@@ -126,7 +126,7 @@ public class TagsController : ControllerBase
 
         await LogAudit(AuditAction.TagCreated, currentUserId, nameof(Tag), tag.Id, $"Tag '{tag.Name}' created");
 
-        var response = new TagDto { Id = tag.Id, Name = tag.Name };
+        var response = new TagDto(tag.Id, tag.Name);
         return CreatedAtAction(nameof(GetTag), new { id = tag.Id }, response);
     }
 
@@ -186,7 +186,7 @@ public class TagsController : ControllerBase
 
         await LogAudit(AuditAction.TagUpdated, currentUserId, nameof(Tag), tag.Id, $"Tag renamed from '{oldName}' to '{tag.Name}'");
 
-        return Ok(new TagDto { Id = tag.Id, Name = tag.Name });
+        return Ok(new TagDto(tag.Id, tag.Name));
     }
 
     /// <summary>

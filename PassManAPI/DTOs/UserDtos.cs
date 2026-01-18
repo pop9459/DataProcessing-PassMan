@@ -57,25 +57,31 @@ public class UpdateProfileRequest
     public string? EncryptedVaultKey { get; set; }
 }
 
-public record UserProfileResponse
+public record UserProfileResponse(
+    int Id,
+    string Email,
+    string? UserName,
+    string? PhoneNumber,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    DateTime? LastLoginAt,
+    string? EncryptedVaultKey,
+    Guid? SubscriptionTierId
+)
 {
-    public int Id { get; init; }
-    public string Email { get; init; } = string.Empty;
-    public string? UserName { get; init; }
-    public string? PhoneNumber { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? UpdatedAt { get; init; }
-    public DateTime? LastLoginAt { get; init; }
-    public string? EncryptedVaultKey { get; init; }
-    public Guid? SubscriptionTierId { get; init; }
+    // Parameterless constructor for XML serialization
+    public UserProfileResponse() : this(0, string.Empty, null, null, DateTime.MinValue, null, null, null, null) { }
 }
 
 /// <summary>
 /// Authentication response payload; accessToken is a placeholder until JWT is added.
 /// </summary>
-public record AuthResponse
+public record AuthResponse(
+    string AccessToken,
+    UserProfileResponse User
+)
 {
-    public string AccessToken { get; init; } = string.Empty;
-    public UserProfileResponse User { get; init; } = new();
-}
+    // Parameterless constructor for XML serialization
+    public AuthResponse() : this(string.Empty, new UserProfileResponse()) { }
+};
 

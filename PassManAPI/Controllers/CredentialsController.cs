@@ -67,7 +67,7 @@ public class CredentialsController : ControllerBase
                 CreatedAt = c.CreatedAt,
                 UpdatedAt = c.UpdatedAt,
                 LastAccessed = c.LastAccessed,
-                Tags = c.CredentialTags.Select(ct => new TagDto { Id = ct.Tag.Id, Name = ct.Tag.Name }).ToList()
+                Tags = c.CredentialTags.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList()
             })
             .ToListAsync();
 
@@ -257,7 +257,7 @@ public class CredentialsController : ControllerBase
         }
 
         var tags = credential.CredentialTags
-            .Select(ct => new TagDto { Id = ct.Tag.Id, Name = ct.Tag.Name })
+            .Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name))
             .ToList();
 
         return Ok(tags);
@@ -336,7 +336,7 @@ public class CredentialsController : ControllerBase
             .AsNoTracking()
             .Where(ct => ct.CredentialId == id)
             .Include(ct => ct.Tag)
-            .Select(ct => new TagDto { Id = ct.Tag.Id, Name = ct.Tag.Name })
+            .Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name))
             .ToListAsync();
 
         return Ok(tags);

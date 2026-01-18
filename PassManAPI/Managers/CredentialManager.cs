@@ -435,6 +435,6 @@ public class CredentialManager : ICredentialManager
             CreatedAt = credential.CreatedAt,
             UpdatedAt = credential.UpdatedAt,
             LastAccessed = credential.LastAccessed,
-            Tags = credential.CredentialTags?.Select(ct => new TagDto { Id = ct.Tag.Id, Name = ct.Tag.Name }).ToList() ?? new List<TagDto>()
+            Tags = credential.CredentialTags?.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList() ?? new List<TagDto>()
         };
 }
