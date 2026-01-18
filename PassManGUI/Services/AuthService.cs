@@ -9,12 +9,7 @@ namespace PassManGUI.Services;
 /// Authentication service that handles login, registration, and token management
 /// Stores tokens in sessionStorage for security (token expires when browser closes)
 /// 
-/// TODO: Future Enhancement - PIN Protection Feature
-/// - After successful login, prompt user to set an optional 4-6 digit PIN
-/// - If PIN is set, store encrypted token in localStorage (persists across sessions)
-/// - On app startup, if token exists in localStorage, require PIN entry to decrypt
-/// - This provides convenience (stay logged in) + security (PIN required to access)
-/// - If user declines PIN, fall back to sessionStorage (current behavior)
+
 /// </summary>
 public class AuthService
 {
@@ -242,7 +237,7 @@ public class AuthService
 
     /// <summary>
     /// Extracts user ID from dev token (format: "dev-token-123")
-    /// TODO: Replace with real JWT parsing when backend is upgraded
+
     /// </summary>
     private int? ExtractUserIdFromToken(string token)
     {
@@ -258,11 +253,9 @@ public class AuthService
                 }
             }
             
-            // TODO: For real JWT, use JWT library to decode and extract userId from claims
+
             // Example:
-            // var handler = new JwtSecurityTokenHandler();
-            // var jwtToken = handler.ReadJwtToken(token);
-            // var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub" || c.Type == "userId");
+
             // return int.Parse(userIdClaim.Value);
         }
         catch (Exception ex)

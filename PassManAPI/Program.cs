@@ -283,7 +283,10 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        app.UseHttpsRedirection();
+        if (!app.Environment.IsEnvironment("Test"))
+        {
+            app.UseHttpsRedirection();
+        }
 
         // Enable CORS
         app.UseCors("AllowFrontend");
