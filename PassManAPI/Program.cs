@@ -111,6 +111,9 @@ public class Program
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
 
+        // Register VaultManager for vault business logic
+        builder.Services.AddScoped<IVaultManager, VaultManager>();
+
         // Register Security Services
         // JWT Token Service
         builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
