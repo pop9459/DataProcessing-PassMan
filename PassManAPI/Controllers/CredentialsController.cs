@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
+using PassManAPI.Services;
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 
@@ -14,10 +15,12 @@ namespace PassManAPI.Controllers;
 public class CredentialsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IPasswordEncryptionService _encryptionService;
 
-    public CredentialsController(ApplicationDbContext db)
+    public CredentialsController(ApplicationDbContext db, IPasswordEncryptionService encryptionService)
     {
         _db = db;
+        _encryptionService = encryptionService;
     }
 
     /// <summary>
@@ -106,11 +109,23 @@ public class CredentialsController : ControllerBase
             return Forbid();
         }
 
+        // Generate a per-credential encryption key (32 bytes)
+        var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
+        
+        // Encrypt the password using the per-credential key  
+        // Note: request.EncryptedPassword contains the plaintext password from the client
+        var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
+        var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
+        
+        // Store the per-credential key as Base64 (in production, this should be encrypted with user's master password)
+        // For now, we'll store it alongside the credential (this is a simplified implementation)
+        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
+
         var credential = new Credential
         {
             Title = request.Title.Trim(),
             Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
-            EncryptedPassword = request.EncryptedPassword,
+            EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}",
             Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url.Trim(),
             Notes = request.Notes,
             CategoryId = request.CategoryId,
@@ -122,6 +137,70 @@ public class CredentialsController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
+    }
+
+    /// <summary>
+    /// Retrieves the decrypted password for a specific credential.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint returns the plaintext password after decryption.
+    /// Use with caution and ensure secure transmission.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the credential.</param>
+    /// <response code="200">Returns the decrypted password.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have permission to access the credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpGet("/api/credentials/{id:int}/password")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
+    public async Task<IActionResult> GetPassword(int id)
+    {
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        // Update last accessed timestamp
+        var credentialToUpdate = await _db.Credentials.FindAsync(id);
+        if (credentialToUpdate != null)
+        {
+            credentialToUpdate.LastAccessed = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
+        // Parse the encrypted password (format: "key:encryptedPassword")
+        var parts = credential.EncryptedPassword.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            // Handle legacy format (unencrypted)
+            return Ok(new { password = credential.EncryptedPassword });
+        }
+
+        var perCredentialKeyBase64 = parts[0];
+        var encryptedPasswordBase64 = parts[1];
+
+        var perCredentialKey = Convert.FromBase64String(perCredentialKeyBase64);
+        var encryptedPasswordBytes = Convert.FromBase64String(encryptedPasswordBase64);
+
+        // Decrypt the password
+        var decryptedPassword = _encryptionService.DecryptPassword(encryptedPasswordBytes, perCredentialKey);
+
+        return Ok(new { password = decryptedPassword });
     }
 
     /// <summary>
@@ -170,6 +249,61 @@ public class CredentialsController : ControllerBase
         credential.Url = string.IsNullOrWhiteSpace(update.Url) ? null : update.Url.Trim();
         credential.Notes = update.Notes;
         credential.CategoryId = update.CategoryId;
+        credential.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates the password of an existing credential.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint updates only the password field of a credential.
+    /// The new password will be encrypted before storage.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the credential to update.</param>
+    /// <param name="request">The new password (plaintext).</param>
+    /// <response code="204">If the password was updated successfully.</response>
+    /// <response code="400">If the provided password data is invalid.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have permission to modify the credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpPut("/api/credentials/{id:int}/password")]
+    [Authorize(Policy = PermissionConstants.CredentialUpdate)]
+    public async Task<IActionResult> UpdatePassword(int id, [FromBody] UpdateCredentialPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!TryGetCurrentUserId(out var currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return NotFound();
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return Forbid();
+        }
+
+        // Generate a new per-credential encryption key
+        var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
+        
+        // Encrypt the new password
+        var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
+        var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
+        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
+
+        credential.EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}";
         credential.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
