@@ -234,7 +234,9 @@ namespace PassManAPI.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     UserAgent = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP(6)")
+                    Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP(6)"),
+                    CredentialId = table.Column<int>(type: "int", nullable: true),
+                    VaultId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -245,6 +247,18 @@ namespace PassManAPI.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_AuditLogs_Credentials_CredentialId",
+                        column: x => x.CredentialId,
+                        principalTable: "Credentials",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_AuditLogs_Vaults_VaultId",
+                        column: x => x.VaultId,
+                        principalTable: "Vaults",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -456,9 +470,18 @@ namespace PassManAPI.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_AuditLogs_UserId",
                 table: "AuditLogs",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuditLogs_CredentialId",
+                table: "AuditLogs",
+                column: "CredentialId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuditLogs_VaultId",
+                table: "AuditLogs",
+                column: "VaultId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Credentials_CategoryId",
