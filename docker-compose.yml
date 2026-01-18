@@ -47,9 +47,7 @@ services:
 
   # Test service - run tests in Docker environment
   test:
-    build:
-      context: .
-      dockerfile: PassManAPI/dockerfile.dev
+    image: mcr.microsoft.com/dotnet/sdk:10.0
     working_dir: /workspace
     environment:
       - ASPNETCORE_ENVIRONMENT=Test
