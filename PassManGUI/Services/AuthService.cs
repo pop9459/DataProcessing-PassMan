@@ -41,9 +41,19 @@ public class AuthService
     }
 
     /// <summary>
+    /// Event triggered when authentication state changes
+    /// </summary>
+    public event Action? OnAuthStateChanged;
+
+    /// <summary>
     /// Gets the currently logged-in user profile
     /// </summary>
     public UserProfile? CurrentUser => _currentUser;
+
+    private void NotifyAuthStateChanged()
+    {
+        OnAuthStateChanged?.Invoke();
+    }
 
     /// <summary>
     /// Checks if user is authenticated
@@ -53,6 +63,7 @@ public class AuthService
         var token = await GetTokenAsync();
         return !string.IsNullOrEmpty(token);
     }
+
 
     /// <summary>
     /// Authenticates user with email and password
@@ -78,6 +89,8 @@ public class AuthService
 
                 // Set authorization header for future requests
                 SetAuthorizationHeader(response.Data.AccessToken);
+                
+                NotifyAuthStateChanged();
 
                 return ApiResponse<UserProfile>.SuccessResponse(response.Data.User);
             }
@@ -151,6 +164,8 @@ public class AuthService
 
                 SetAuthorizationHeader(response.Data.AccessToken);
 
+                NotifyAuthStateChanged();
+
                 return ApiResponse<UserProfile>.SuccessResponse(response.Data.User);
             }
 
@@ -175,6 +190,7 @@ public class AuthService
         await RemoveUserIdAsync();
         _currentUser = null;
         _httpClient.DefaultRequestHeaders.Authorization = null;
+        NotifyAuthStateChanged();
     }
 
     /// <summary>
@@ -212,6 +228,7 @@ public class AuthService
             if (response.Success && response.Data != null)
             {
                 _currentUser = response.Data;
+                NotifyAuthStateChanged();
             }
             else
             {

@@ -23,15 +23,21 @@
                     </a>
                 </div>
                 
-                <div class="header-content">
+            <div class="header-content">
                     <div class="header-left">
                         <div class="vault-info">
-                            <h1>@vaultName</h1>
+                            <h1>
+                                @if (!string.IsNullOrEmpty(vaultIcon))
+                                {
+                                    <span class="vault-header-icon">@vaultIcon</span>
+                                }
+                                @vaultName
+                            </h1>
                             <p>@vaultDescription</p>
                         </div>
                     </div>
                     <div class="header-right">
-                        <button class="btn-secondary">Vault Settings</button>
+                        <button class="btn-secondary" @onclick="GoToSettings">Vault Settings</button>
                         <button class="btn-primary" @onclick="AddItem">+ New Item</button>
                     </div>
                 </div>
@@ -127,6 +133,7 @@
     
     private string vaultName = "";
     private string vaultDescription = "";
+    private string vaultIcon = "";
     private List<VaultItemModel> items = new();
     private bool isLoading = true;
     private string errorMessage = string.Empty;
@@ -174,6 +181,7 @@
             {
                 vaultName = vaultResult.Data.Name;
                 vaultDescription = vaultResult.Data.Description ?? "";
+                vaultIcon = vaultResult.Data.Icon ?? "";
             }
             else
             {
@@ -286,5 +294,11 @@
             await LoadVaultItems();
             ClosePanel();
         }
+    }
+
+    private void GoToSettings()
+    {
+        // TODO: Implement Vault Settings Modal
+        Console.WriteLine("Navigate to vault settings");
     }
 }

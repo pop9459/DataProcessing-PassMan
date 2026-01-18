@@ -1,0 +1,137 @@
+@page "/settings"
+@using PassManGUI.Models
+@using PassManGUI.Services
+@inject IApiService ApiService
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+@rendermode InteractiveServer
+
+<PageTitle>Settings - PassMan</PageTitle>
+
+<div class="page-grid">
+    <div class="page-content">
+        <div class="settings-container">
+            <div class="settings-header">
+                <h1>Settings</h1>
+                <p>Manage your account and preferences.</p>
+            </div>
+            
+            @if (isLoading)
+            {
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading profile...</p>
+                </div>
+            }
+            else if (userProfile != null)
+            {
+                <div class="settings-section">
+                    <h2>Profile</h2>
+                    <div class="profile-card">
+                        <div class="profile-avatar">
+                            <span>@(userProfile.UserName?.Substring(0, 1).ToUpper() ?? "?")</span>
+                        </div>
+                        <div class="profile-info">
+                            <div class="info-group">
+                                <label>Username</label>
+                                <div class="info-value">@userProfile.UserName</div>
+                            </div>
+                            <div class="info-group">
+                                <label>Email</label>
+                                <div class="info-value">@userProfile.Email</div>
+                            </div>
+                            <div class="info-group">
+                                <label>Member Since</label>
+                                <div class="info-value">@userProfile.CreatedAt.ToLocalTime().ToString("MMMM dd, yyyy")</div>
+                            </div>
+                        </div>
+                        <div class="profile-actions">
+                            <button class="btn-secondary" @onclick="ShowComingSoon">Edit Profile</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h2>Security</h2>
+                    <div class="security-card">
+                        <div class="security-item">
+                            <div class="security-info">
+                                <h3>Password</h3>
+                                <p>Last updated: never (Demo)</p>
+                            </div>
+                            <button class="btn-secondary" @onclick="ShowComingSoon">Change Password</button>
+                        </div>
+                        <div class="security-item">
+                            <div class="security-info">
+                                <h3>Two-Factor Authentication</h3>
+                                <p>Add an extra layer of security to your account.</p>
+                            </div>
+                            <button class="btn-secondary" @onclick="ShowComingSoon" disabled>Enable 2FA</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Session</h2>
+                    <button class="btn-danger" @onclick="HandleLogout">Sign Out</button>
+                </div>
+            }
+            else
+            {
+                <div class="error-state">
+                    <p>Failed to load profile.</p>
+                    <button class="btn-primary" @onclick="LoadProfile">Try Again</button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserProfile? userProfile;
+    private bool isLoading = true;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadProfile();
+        }
+    }
+    
+    private async Task LoadProfile()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+            
+            var result = await ApiService.GetCurrentUserAsync();
+            if (result.Success)
+            {
+                userProfile = result.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading profile: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ShowComingSoon()
+    {
+        await Js.InvokeVoidAsync("alert", "This feature is coming soon!");
+    }
+    
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+}
