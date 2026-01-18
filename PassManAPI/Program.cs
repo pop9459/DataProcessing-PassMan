@@ -91,7 +91,11 @@ public class Program
             foreach (var permission in PermissionConstants.All)
             {
                 options.AddPolicy(permission, policy =>
-                    policy.RequireClaim(PermissionConstants.ClaimType, permission));
+                {
+                    policy.AddAuthenticationSchemes(DevHeaderAuthenticationHandler.Scheme);
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission);
+                });
             }
         });
 
