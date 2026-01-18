@@ -10,32 +10,15 @@ namespace PassManAPI.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Icon",
-                table: "Vaults",
-                type: "varchar(50)",
-                maxLength: 50,
-                nullable: true)
-                .Annotation("MySql:CharSet", "utf8mb4");
-
-            migrationBuilder.AddColumn<bool>(
-                name: "IsDeleted",
-                table: "Vaults",
-                type: "tinyint(1)",
-                nullable: false,
-                defaultValue: false);
+            // No-op: Icon and IsDeleted columns were introduced in an earlier migration
+            // (20260117205357_AddIconAndIsDeletedToVault). Keeping this migration empty
+            // prevents duplicate column errors when applying the migration set to a fresh DB.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "Icon",
-                table: "Vaults");
-
-            migrationBuilder.DropColumn(
-                name: "IsDeleted",
-                table: "Vaults");
+            // No-op: see Up() comment.
         }
     }
 }
