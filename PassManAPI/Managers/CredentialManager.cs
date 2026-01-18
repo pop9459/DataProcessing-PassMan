@@ -422,18 +422,19 @@ public class CredentialManager : ICredentialManager
     }
 
     private static CredentialDto ToDto(Credential credential) =>
-        new(
-            Id: credential.Id,
-            Title: credential.Title,
-            Username: credential.Username,
-            Url: credential.Url,
-            Notes: credential.Notes,
-            CategoryId: credential.CategoryId,
-            CategoryName: credential.Category?.Name,
-            VaultId: credential.VaultId,
-            CreatedAt: credential.CreatedAt,
-            UpdatedAt: credential.UpdatedAt,
-            LastAccessed: credential.LastAccessed,
-            Tags: credential.CredentialTags?.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList() ?? new List<TagDto>()
-        );
+        new()
+        {
+            Id = credential.Id,
+            Title = credential.Title,
+            Username = credential.Username,
+            Url = credential.Url,
+            Notes = credential.Notes,
+            CategoryId = credential.CategoryId,
+            CategoryName = credential.Category?.Name,
+            VaultId = credential.VaultId,
+            CreatedAt = credential.CreatedAt,
+            UpdatedAt = credential.UpdatedAt,
+            LastAccessed = credential.LastAccessed,
+            Tags = credential.CredentialTags?.Select(ct => new TagDto { Id = ct.Tag.Id, Name = ct.Tag.Name }).ToList() ?? new List<TagDto>()
+        };
 }

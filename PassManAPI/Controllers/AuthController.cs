@@ -84,7 +84,7 @@ public class AuthController : ControllerBase
         }
 
         var token = $"dev-token-{result.Data.Id}";
-        var response = new AuthResponse(token, ToProfile(result.Data));
+        var response = new AuthResponse { AccessToken = token, User = ToProfile(result.Data) };
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
 
@@ -119,7 +119,7 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = $"dev-token-{user.Id}";
-        return Ok(new AuthResponse(token, ToProfile(user)));
+        return Ok(new AuthResponse { AccessToken = token, User = ToProfile(user) });
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public class AuthController : ControllerBase
             }
 
             var token = $"dev-token-{user.Id}";
-            return Ok(new AuthResponse(token, ToProfile(user)));
+            return Ok(new AuthResponse { AccessToken = token, User = ToProfile(user) });
 
         }
         catch (InvalidJwtException ex)
@@ -337,7 +337,7 @@ public class AuthController : ControllerBase
             await LogAuditAsync(AuditAction.UserRoleChanged, actorId.Value, $"Assigned role '{request.Role}' to user {request.UserId}");
         }
 
-        return Ok(new { request.UserId, Role = request.Role });
+        return Ok(new RoleAssignmentResponse { UserId = request.UserId, Role = request.Role });
     }
 
     private async Task LogAuditAsync(AuditAction action, int actorUserId, string? details = null)
@@ -361,30 +361,32 @@ public class AuthController : ControllerBase
     }
 
     private static UserProfileResponse ToProfile(User user) =>
-        new(
-            user.Id,
-            user.Email ?? string.Empty,
-            user.UserName,
-            user.PhoneNumber,
-            user.CreatedAt,
-            user.UpdatedAt,
-            user.LastLoginAt,
-            user.EncryptedVaultKey,
-            user.SubscriptionTierId
-        );
+        new()
+        {
+            Id = user.Id,
+            Email = user.Email ?? string.Empty,
+            UserName = user.UserName,
+            PhoneNumber = user.PhoneNumber,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            LastLoginAt = user.LastLoginAt,
+            EncryptedVaultKey = user.EncryptedVaultKey,
+            SubscriptionTierId = user.SubscriptionTierId
+        };
 
     private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
-        new(
-            user.Id,
-            user.Email,
-            user.UserName,
-            user.PhoneNumber,
-            user.CreatedAt,
-            user.UpdatedAt,
-            user.LastLoginAt,
-            user.EncryptedVaultKey,
-            user.SubscriptionTierId
-        );
+        new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            UserName = user.UserName,
+            PhoneNumber = user.PhoneNumber,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            LastLoginAt = user.LastLoginAt,
+            EncryptedVaultKey = user.EncryptedVaultKey,
+            SubscriptionTierId = user.SubscriptionTierId
+        };
 
     private async Task<(bool Success, string? Error)> AddUserToRoleAsync(User user, string roleName)
     {

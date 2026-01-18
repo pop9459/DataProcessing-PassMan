@@ -42,7 +42,7 @@ public class VaultsController : ControllerBase
             return BadRequest(result.Error);
         }
 
-        var response = result.Data!.Select(ToResponse);
+        var response = result.Data!.Select(ToResponse).ToList();
         return Ok(response);
     }
 

@@ -5,10 +5,11 @@ namespace PassManAPI.DTOs;
 /// <summary>
 /// Response DTO for Tag information.
 /// </summary>
-public record TagDto(
-    int Id,
-    string Name
-);
+public record TagDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// Request DTO for creating a new tag.
