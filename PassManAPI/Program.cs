@@ -1,5 +1,7 @@
 namespace PassManAPI;
 
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,9 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
+using PassManAPI.Middleware;
 using PassManAPI.Services;
+using PassManAPI.Validators;
 
 public class Program
 {
@@ -111,6 +115,9 @@ public class Program
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
 
+        // Register VaultManager for vault business logic
+        builder.Services.AddScoped<IVaultManager, VaultManager>();
+
         // Register Security Services
         // JWT Token Service
         builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
@@ -126,7 +133,18 @@ public class Program
         builder.Services.Configure<BreachCheckSettings>(builder.Configuration.GetSection(BreachCheckSettings.SectionName));
         builder.Services.AddHttpClient<IBreachCheckService, BreachCheckService>();
 
+        // Register Business Managers
+        builder.Services.AddScoped<ISharingManager, SharingManager>();
+        builder.Services.AddScoped<IAuthManager, AuthManager>();
+
+        // FluentValidation - auto-validate request models
+        builder.Services.AddFluentValidationAutoValidation();
+        builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
+
         var app = builder.Build();
+
+        // Global exception handler middleware (must be early in pipeline)
+        app.UseGlobalExceptionHandler();
 
         using (var scope = app.Services.CreateScope())
         {
