@@ -8,26 +8,54 @@ public class VaultResponse
     public int Id { get; set; }
     public required string Name { get; set; }
     public string? Description { get; set; }
+    public string? Icon { get; set; }
     public int UserId { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsOwner { get; set; }
 }
 
 /// <summary>
-/// Vault item (credential) model
+/// Request to create a new vault
+/// </summary>
+public class CreateVaultRequest
+{
+    public required string Name { get; set; }
+    public string? Description { get; set; }
+    public string? Icon { get; set; }
+    public int UserId { get; set; }
+}
+
+/// <summary>
+/// Request to update an existing vault
+/// </summary>
+public class UpdateVaultRequest
+{
+    public required string Name { get; set; }
+    public string? Description { get; set; }
+    public string? Icon { get; set; }
+}
+
+/// <summary>
+/// Vault item (credential) model - maps to API response
 /// </summary>
 public class VaultItemModel
 {
     public int Id { get; set; }
-    public required string Name { get; set; }
+    public string Title { get; set; } = string.Empty;
     public string? Username { get; set; }
-    public string? Password { get; set; }
+    public string? Password { get; set; } // For form input - maps to EncryptedPassword in API
     public string? Url { get; set; }
     public string? Notes { get; set; }
-    public string? Label { get; set; }
     public int VaultId { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? LastAccessed { get; set; }
+    public List<TagDto>? Tags { get; set; }
+    
+    // For UI compatibility - map Title to Name
+    public string Name => Title;
+    public string? Label => Tags?.FirstOrDefault()?.Name;
     
     public string FormatTimeAgo()
     {
@@ -52,26 +80,38 @@ public class VaultItemModel
 }
 
 /// <summary>
-/// Request to create a new vault item
+/// Tag DTO
 /// </summary>
-public class CreateVaultItemRequest
+public class TagDto
 {
-    public required string Name { get; set; }
-    public string? Username { get; set; }
-    public string? Password { get; set; }
-    public string? Url { get; set; }
-    public string? Notes { get; set; }
-    public int VaultId { get; set; }
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    
+    public TagDto() { }
+    public TagDto(int id, string name) { Id = id; Name = name; }
 }
 
 /// <summary>
-/// Request to update an existing vault item
+/// Request to create a new credential
+/// </summary>
+public class CreateVaultItemRequest
+{
+    public required string Title { get; set; }
+    public string? Username { get; set; }
+    public string? EncryptedPassword { get; set; }
+    public string? Url { get; set; }
+    public string? Notes { get; set; }
+    public int? CategoryId { get; set; }
+}
+
+/// <summary>
+/// Request to update an existing credential
 /// </summary>
 public class UpdateVaultItemRequest
 {
-    public string? Name { get; set; }
+    public string? Title { get; set; }
     public string? Username { get; set; }
-    public string? Password { get; set; }
+    public string? EncryptedPassword { get; set; }
     public string? Url { get; set; }
     public string? Notes { get; set; }
 }

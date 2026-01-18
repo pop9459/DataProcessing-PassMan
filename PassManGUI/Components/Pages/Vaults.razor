@@ -5,29 +5,7 @@
 @inject IApiService ApiService
 @using PassManGUI.Services
 @using PassManGUI.Models
-
-@* 
-    Vaults Page - Main dashboard displaying all user's vaults
-    
-    Status: ✅ Connected to API via ApiService and AuthService
-    
-    TODO:
-    1. Vault Management
-       - Create vault modal/form
-       - Edit vault functionality
-       - Delete vault with confirmation
-       - Share vault with other users
-    
-    2. Search & Filter
-       - Search vaults by name
-       - Filter by date modified, item count
-       - Sort options (name, date, items)
-    
-    3. User Interface
-       - User profile dropdown menu
-       - Settings page navigation
-       - Logout functionality
-*@
+@using PassManGUI.Components.Shared
 
 <PageTitle>My Vaults - PassMan</PageTitle>
 
@@ -42,7 +20,7 @@
                         <p>Manage your secure credential vaults</p>
                     </div>
                     <div class="header-right">
-                        <button class="btn-primary" @onclick="CreateVault">+ New Vault</button>
+                        <button class="btn-primary" @onclick="OpenCreateModal">+ New Vault</button>
                     </div>
                 </div>
             </div>
@@ -77,7 +55,7 @@
                         </svg>
                         <h2>No vaults yet</h2>
                         <p>Create your first vault to start storing your passwords securely.</p>
-                        <button class="btn-primary" @onclick="CreateVault">Create Your First Vault</button>
+                        <button class="btn-primary" @onclick="OpenCreateModal">Create Your First Vault</button>
                     </div>
                 }
                 else
@@ -88,7 +66,27 @@
                         {
                             <div class="vault-card" @onclick="() => OpenVault(vault.Id)">
                                 <div class="vault-card-header">
+                                    @if (!string.IsNullOrEmpty(vault.Icon))
+                                    {
+                                        <span class="vault-icon">@vault.Icon</span>
+                                    }
                                     <h3>@vault.Name</h3>
+                                    @if (vault.IsOwner)
+                                    {
+                                        <div class="vault-actions" @onclick:stopPropagation="true">
+                                            <button class="icon-btn" title="Edit vault" @onclick="() => OpenEditModal(vault)">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                            <button class="icon-btn danger" title="Delete vault" @onclick="() => OpenDeleteModal(vault)">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    }
                                 </div>
                                 @if (!string.IsNullOrEmpty(vault.Description))
                                 {
@@ -97,9 +95,9 @@
                                 <div class="vault-card-footer">
                                     <span class="last-modified">
                                         Created @vault.CreatedAt.ToString("MMM dd, yyyy")
-                                        @if (vault.UpdatedAt != default && vault.UpdatedAt != vault.CreatedAt)
+                                        @if (vault.UpdatedAt.HasValue && vault.UpdatedAt != vault.CreatedAt)
                                         {
-                                            <span> • Updated @vault.UpdatedAt.ToString("MMM dd, yyyy")</span>
+                                            <span> • Updated @vault.UpdatedAt.Value.ToString("MMM dd, yyyy")</span>
                                         }
                                     </span>
                                 </div>
@@ -112,30 +110,54 @@
     </div>
 </div>
 
+<!-- Create/Edit Vault Modal -->
+<VaultModal 
+    @bind-IsVisible="showVaultModal"
+    IsEditMode="isEditMode"
+    ExistingVault="selectedVault"
+    OnSave="HandleVaultSave" />
+
+<!-- Delete Confirmation Modal -->
+<ConfirmModal
+    @bind-IsVisible="showDeleteModal"
+    Title="Delete Vault"
+    Message="@($"Are you sure you want to delete '{vaultToDelete?.Name}'?")"
+    SubMessage="This action cannot be undone. All credentials in this vault will be permanently deleted."
+    ConfirmText="Delete Vault"
+    ProcessingText="Deleting..."
+    OnConfirm="HandleDeleteConfirm" />
+
 @code {
     private List<VaultResponse> vaults = new();
     private bool isLoading = true;
     private string errorMessage = string.Empty;
     private bool isAuthenticated = false;
-    private bool hasCheckedAuth = false;
+    private int? currentUserId;
+    
+    // Modal state
+    private bool showVaultModal = false;
+    private bool isEditMode = false;
+    private VaultResponse? selectedVault;
+    
+    // Delete modal state
+    private bool showDeleteModal = false;
+    private VaultResponse? vaultToDelete;
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // JS interop is only available after first render
-            var userId = await AuthService.GetUserIdAsync();
+            currentUserId = await AuthService.GetUserIdAsync();
             
-            if (!userId.HasValue)
+            if (!currentUserId.HasValue)
             {
                 Console.WriteLine("[Vaults] No userId found, redirecting to login");
                 Navigation.NavigateTo("/login");
                 return;
             }
             
-            Console.WriteLine($"[Vaults] User authenticated: userId={userId}");
+            Console.WriteLine($"[Vaults] User authenticated: userId={currentUserId}");
             isAuthenticated = true;
-            hasCheckedAuth = true;
             await LoadVaults();
             StateHasChanged();
         }
@@ -149,14 +171,13 @@
             errorMessage = string.Empty;
             StateHasChanged();
             
-            var userId = await AuthService.GetUserIdAsync();
-            if (!userId.HasValue)
+            if (!currentUserId.HasValue)
             {
                 Navigation.NavigateTo("/login");
                 return;
             }
             
-            var result = await ApiService.GetVaultsAsync(userId.Value);
+            var result = await ApiService.GetVaultsAsync(currentUserId.Value);
             
             if (result.Success && result.Data != null)
             {
@@ -179,10 +200,89 @@
         }
     }
     
-    private void CreateVault()
+    private void OpenCreateModal()
     {
-        // TODO: Implement vault creation modal/page
-        Console.WriteLine("Create vault clicked");
+        isEditMode = false;
+        selectedVault = null;
+        showVaultModal = true;
+    }
+    
+    private void OpenEditModal(VaultResponse vault)
+    {
+        isEditMode = true;
+        selectedVault = vault;
+        showVaultModal = true;
+    }
+    
+    private void OpenDeleteModal(VaultResponse vault)
+    {
+        vaultToDelete = vault;
+        showDeleteModal = true;
+    }
+    
+    private async Task HandleVaultSave(VaultModal.VaultFormData formData)
+    {
+        if (!currentUserId.HasValue) return;
+        
+        if (isEditMode && selectedVault != null)
+        {
+            // Update existing vault
+            var request = new UpdateVaultRequest
+            {
+                Name = formData.Name,
+                Description = formData.Description,
+                Icon = formData.Icon
+            };
+            
+            var result = await ApiService.UpdateVaultAsync(selectedVault.Id, request);
+            if (result.Success)
+            {
+                await LoadVaults();
+            }
+            else
+            {
+                throw new Exception(result.ErrorMessage ?? "Failed to update vault");
+            }
+        }
+        else
+        {
+            // Create new vault
+            var request = new CreateVaultRequest
+            {
+                Name = formData.Name,
+                Description = formData.Description,
+                Icon = formData.Icon,
+                UserId = currentUserId.Value
+            };
+            
+            var result = await ApiService.CreateVaultAsync(request);
+            if (result.Success)
+            {
+                await LoadVaults();
+            }
+            else
+            {
+                throw new Exception(result.ErrorMessage ?? "Failed to create vault");
+            }
+        }
+    }
+    
+    private async Task HandleDeleteConfirm()
+    {
+        if (vaultToDelete == null) return;
+        
+        var result = await ApiService.DeleteVaultAsync(vaultToDelete.Id);
+        if (result.Success)
+        {
+            vaults.RemoveAll(v => v.Id == vaultToDelete.Id);
+            StateHasChanged();
+        }
+        else
+        {
+            errorMessage = result.ErrorMessage ?? "Failed to delete vault";
+        }
+        
+        vaultToDelete = null;
     }
     
     private void OpenVault(int vaultId)

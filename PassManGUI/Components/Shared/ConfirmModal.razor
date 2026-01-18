@@ -1,0 +1,80 @@
+@if (IsVisible)
+{
+    <div class="modal-overlay" @onclick="OnOverlayClick">
+        <div class="modal-content confirm-modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <div class="warning-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h2>@Title</h2>
+            </div>
+            
+            <div class="modal-body">
+                <p>@Message</p>
+                @if (!string.IsNullOrEmpty(SubMessage))
+                {
+                    <p class="sub-message">@SubMessage</p>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="Cancel" disabled="@IsProcessing">Cancel</button>
+                <button class="btn-danger" @onclick="Confirm" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span class="spinner-small"></span>
+                        <span>@ProcessingText</span>
+                    }
+                    else
+                    {
+                        <span>@ConfirmText</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm Delete";
+    [Parameter] public string Message { get; set; } = "Are you sure you want to delete this item?";
+    [Parameter] public string? SubMessage { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Delete";
+    [Parameter] public string ProcessingText { get; set; } = "Deleting...";
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    
+    private bool IsProcessing { get; set; }
+    
+    private async Task Cancel()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+    
+    private void OnOverlayClick()
+    {
+        if (!IsProcessing)
+        {
+            _ = Cancel();
+        }
+    }
+    
+    private async Task Confirm()
+    {
+        IsProcessing = true;
+        
+        try
+        {
+            await OnConfirm.InvokeAsync();
+            await Cancel();
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+}
