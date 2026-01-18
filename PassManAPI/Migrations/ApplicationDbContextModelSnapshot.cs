@@ -165,6 +165,9 @@ namespace PassManAPI.Migrations
                     b.Property<int>("Action")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CredentialId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Details")
                         .HasColumnType("TEXT");
 
@@ -182,7 +185,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("Timestamp")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
                     b.Property<string>("UserAgent")
                         .HasMaxLength(500)
@@ -191,9 +194,16 @@ namespace PassManAPI.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("VaultId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("CredentialId");
+
                     b.HasIndex("UserId");
+
+                    b.HasIndex("VaultId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -284,7 +294,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
                     b.Property<string>("EncryptedPassword")
                         .IsRequired()
@@ -385,7 +395,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -468,7 +478,7 @@ namespace PassManAPI.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -580,13 +590,27 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
                 {
+                    b.HasOne("PassManAPI.Models.Credential", "Credential")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("CredentialId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PassManAPI.Models.User", "User")
                         .WithMany("AuditLogs")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PassManAPI.Models.Vault", "Vault")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("VaultId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Credential");
+
                     b.Navigation("User");
+
+                    b.Navigation("Vault");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
@@ -680,6 +704,8 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
                 {
+                    b.Navigation("AuditLogs");
+
                     b.Navigation("CredentialTags");
                 });
 
@@ -699,6 +725,8 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Vault", b =>
                 {
+                    b.Navigation("AuditLogs");
+
                     b.Navigation("Credentials");
 
                     b.Navigation("SharedUsers");
