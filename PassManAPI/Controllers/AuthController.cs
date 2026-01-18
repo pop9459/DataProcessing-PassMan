@@ -94,7 +94,11 @@ public class AuthController : ControllerBase
             result.Data.Email,
             result.Data.UserName
         );
-        var response = new AuthResponse(token, ToProfile(result.Data));
+        var response = new AuthResponse
+        {
+            AccessToken = token,
+            User = ToProfile(result.Data)
+        };
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
 
@@ -144,7 +148,11 @@ public class AuthController : ControllerBase
         await _identityUserManager.UpdateAsync(user);
 
         var token = _jwtTokenService.CreateAccessToken(user);
-        return Ok(new AuthResponse(token, ToProfile(user)));
+        return Ok(new AuthResponse
+        {
+            AccessToken = token,
+            User = ToProfile(user)
+        });
     }
 
     /// <summary>
@@ -200,7 +208,11 @@ public class AuthController : ControllerBase
             }
 
             var token = _jwtTokenService.CreateAccessToken(user);
-            return Ok(new AuthResponse(token, ToProfile(user)));
+            return Ok(new AuthResponse
+            {
+                AccessToken = token,
+                User = ToProfile(user)
+            });
 
         }
         catch (InvalidJwtException ex)
@@ -304,30 +316,32 @@ public class AuthController : ControllerBase
     }
 
     private static UserProfileResponse ToProfile(User user) =>
-        new(
-            user.Id,
-            user.Email ?? string.Empty,
-            user.UserName,
-            user.PhoneNumber,
-            user.CreatedAt,
-            user.UpdatedAt,
-            user.LastLoginAt,
-            user.EncryptedVaultKey,
-            null // SubscriptionTierId
-        );
+        new()
+        {
+            Id = user.Id,
+            Email = user.Email ?? string.Empty,
+            UserName = user.UserName,
+            PhoneNumber = user.PhoneNumber,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            LastLoginAt = user.LastLoginAt,
+            EncryptedVaultKey = user.EncryptedVaultKey,
+            SubscriptionTierId = null
+        };
 
     private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
-        new(
-            user.Id,
-            user.Email,
-            user.UserName,
-            user.PhoneNumber,
-            user.CreatedAt,
-            user.UpdatedAt,
-            user.LastLoginAt,
-            user.EncryptedVaultKey,
-            null // SubscriptionTierId
-        );
+        new()
+        {
+            Id = user.Id,
+            Email = user.Email,
+            UserName = user.UserName,
+            PhoneNumber = user.PhoneNumber,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            LastLoginAt = user.LastLoginAt,
+            EncryptedVaultKey = user.EncryptedVaultKey,
+            SubscriptionTierId = null
+        };
 
     // Reads the authenticated user id from standard JWT claims.
     private int? GetUserId()
@@ -447,4 +461,7 @@ public record AssignRoleRequest
 /// <summary>
 /// Request for Google OAuth login.
 /// </summary>
-public record GoogleLoginRequest(string IdToken);
+public class GoogleLoginRequest
+{
+    public string IdToken { get; set; } = string.Empty;
+}

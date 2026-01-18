@@ -154,6 +154,43 @@ namespace PassManAPI.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Attachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                    b.Property<int>("CredentialId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("EncryptedSymmetricKey")
+                        .IsRequired()
+                        .HasColumnType("longblob");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId");
+
+                    b.ToTable("Attachments");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
                 {
                     b.Property<int>("Id")
@@ -205,7 +242,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("VaultId");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Category", b =>
@@ -227,7 +264,7 @@ namespace PassManAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
 
                     b.HasData(
                         new
@@ -331,7 +368,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("VaultId");
 
-                    b.ToTable("Credentials", (string)null);
+                    b.ToTable("Credentials");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.CredentialTag", b =>
@@ -348,7 +385,47 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("TagId");
 
-                    b.ToTable("CredentialTags", (string)null);
+                    b.ToTable("CredentialTags");
+                });
+
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("InviteToken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("InvitedEmail")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VaultId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InviteToken")
+                        .IsUnique();
+
+                    b.HasIndex("VaultId", "InvitedEmail");
+
+                    b.ToTable("Invitations");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
@@ -374,7 +451,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Tags", (string)null);
+                    b.ToTable("Tags");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.User", b =>
@@ -506,7 +583,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Vaults", (string)null);
+                    b.ToTable("Vaults");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.VaultShare", b =>
@@ -534,7 +611,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("VaultShares", (string)null);
+                    b.ToTable("VaultShares");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
@@ -586,6 +663,17 @@ namespace PassManAPI.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PassManAPI.Models.Attachment", b =>
+                {
+                    b.HasOne("PassManAPI.Models.Credential", "Credential")
+                        .WithMany("Attachments")
+                        .HasForeignKey("CredentialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Credential");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
@@ -650,10 +738,21 @@ namespace PassManAPI.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
+                {
+                    b.HasOne("PassManAPI.Models.Vault", "Vault")
+                        .WithMany("Invitations")
+                        .HasForeignKey("VaultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vault");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
                 {
                     b.HasOne("PassManAPI.Models.User", "User")
-                        .WithMany()
+                        .WithMany("Tags")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -704,6 +803,8 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
                 {
+                    b.Navigation("Attachments");
+
                     b.Navigation("AuditLogs");
 
                     b.Navigation("CredentialTags");
@@ -720,6 +821,8 @@ namespace PassManAPI.Migrations
 
                     b.Navigation("SharedVaults");
 
+                    b.Navigation("Tags");
+
                     b.Navigation("Vaults");
                 });
 
@@ -728,6 +831,8 @@ namespace PassManAPI.Migrations
                     b.Navigation("AuditLogs");
 
                     b.Navigation("Credentials");
+
+                    b.Navigation("Invitations");
 
                     b.Navigation("SharedUsers");
                 });
