@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using PassManAPI.Data;
 using PassManAPI.Models;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace PassManAPI.Tests;
 
@@ -36,6 +37,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 options.UseSqlite(connection);
                 options.EnableSensitiveDataLogging();
             });
+
+            // Use Ephemeral keys for DataProtection to suppress file system warnings
+            services.AddDataProtection().UseEphemeralDataProtectionProvider();
 
             // Build service provider to apply schema
             var sp = services.BuildServiceProvider();
