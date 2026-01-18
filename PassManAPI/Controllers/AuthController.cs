@@ -155,7 +155,8 @@ public class AuthController : ControllerBase
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     LastLoginAt = DateTime.UtcNow,
-                    EmailConfirmed = true
+                    EmailConfirmed = true,
+                    SubscriptionTierId = SubscriptionTier.DefaultTiers.First(t => t.Name == "Free").Id
                 };
 
                 _db.Users.Add(user);

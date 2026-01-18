@@ -104,7 +104,8 @@ public class UserManager
             PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim(),
             EncryptedVaultKey = request.EncryptedVaultKey,
             CreatedAt = DateTime.UtcNow,
-            SecurityStamp = Guid.NewGuid().ToString()
+            SecurityStamp = Guid.NewGuid().ToString(),
+            SubscriptionTierId = SubscriptionTier.DefaultTiers.First(t => t.Name == "Free").Id
         };
 
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
