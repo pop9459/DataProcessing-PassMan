@@ -54,19 +54,15 @@ public class CredentialsController : ControllerBase
             .Where(c => c.VaultId == vaultId)
             .Include(c => c.CredentialTags)
                 .ThenInclude(ct => ct.Tag)
-            .Select(c => new CredentialDto
+            .Select(c => new
             {
-                Id = c.Id,
-                Title = c.Title,
-                Username = c.Username,
-                Url = c.Url,
-                Notes = c.Notes,
-                CategoryId = c.CategoryId,
-                CategoryName = c.Category != null ? c.Category.Name : null,
-                VaultId = c.VaultId,
-                CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt,
-                LastAccessed = c.LastAccessed,
+                c.Id,
+                c.Title,
+                c.Username,
+                c.Url,
+                c.CreatedAt,
+                c.UpdatedAt,
+                c.LastAccessed,
                 Tags = c.CredentialTags.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList()
             })
             .ToListAsync();
@@ -125,7 +121,7 @@ public class CredentialsController : ControllerBase
         _db.Credentials.Add(credential);
         await _db.SaveChangesAsync();
 
-        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new IdResponse { Id = credential.Id });
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
     }
 
     /// <summary>
@@ -399,7 +395,7 @@ public class CredentialsController : ControllerBase
         _db.CredentialTags.Add(new CredentialTag(id, tagId));
         await _db.SaveChangesAsync();
 
-        return Ok(new TagAssignmentResponse { Message = "Tag added successfully." });
+        return Ok(new { message = "Tag added successfully." });
     }
 
     /// <summary>
