@@ -16,6 +16,8 @@ namespace PassManAPI.Data
         public DbSet<Category> Categories { get; set; }
         public DbSet<VaultShare> VaultShares { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Tag> Tags { get; set; }
+        public DbSet<CredentialTag> CredentialTags { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -42,7 +44,7 @@ namespace PassManAPI.Data
                 .Property(v => v.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            // Global query filter for soft delete
+            // Global query filter for soft delete - automatically excludes deleted vaults
             modelBuilder
                 .Entity<Vault>()
                 .HasQueryFilter(v => !v.IsDeleted);
@@ -96,6 +98,29 @@ namespace PassManAPI.Data
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Tag configurations
+            modelBuilder
+                .Entity<Tag>()
+                .HasIndex(t => t.Name)
+                .IsUnique();
+
+            // CredentialTag configurations (composite key for many-to-many)
+            modelBuilder.Entity<CredentialTag>().HasKey(ct => new { ct.CredentialId, ct.TagId });
+
+            modelBuilder
+                .Entity<CredentialTag>()
+                .HasOne(ct => ct.Credential)
+                .WithMany(c => c.CredentialTags)
+                .HasForeignKey(ct => ct.CredentialId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<CredentialTag>()
+                .HasOne(ct => ct.Tag)
+                .WithMany(t => t.CredentialTags)
+                .HasForeignKey(ct => ct.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);

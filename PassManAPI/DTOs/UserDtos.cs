@@ -65,7 +65,8 @@ public record UserProfileResponse(
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     DateTime? LastLoginAt,
-    string? EncryptedVaultKey
+    string? EncryptedVaultKey,
+    Guid? SubscriptionTierId
 );
 
 /// <summary>

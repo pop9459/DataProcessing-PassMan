@@ -16,13 +16,13 @@ namespace PassManAPI.Models
         public string? Description { get; set; }
 
         /// <summary>
-        /// Optional icon/emoji for the vault
+        /// Optional icon identifier (emoji or icon name) for the vault.
         /// </summary>
         [MaxLength(50)]
         public string? Icon { get; set; }
 
         /// <summary>
-        /// Soft delete flag - when true, vault is considered deleted
+        /// Soft delete flag. When true, the vault is considered deleted but retained in DB.
         /// </summary>
         public bool IsDeleted { get; set; } = false;
 

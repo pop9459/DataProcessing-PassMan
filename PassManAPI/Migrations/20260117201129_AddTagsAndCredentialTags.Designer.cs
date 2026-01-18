@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PassManAPI.Data;
 
@@ -11,9 +12,11 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260117201129_AddTagsAndCredentialTags")]
+    partial class AddTagsAndCredentialTags
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -354,15 +357,10 @@ namespace PassManAPI.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique();
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Tags");
                 });
@@ -426,12 +424,6 @@ namespace PassManAPI.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("longtext");
 
-                    b.Property<Guid?>("SubscriptionTierId")
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("TotpSecret")
-                        .HasColumnType("longtext");
-
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("tinyint(1)");
 
@@ -473,13 +465,6 @@ namespace PassManAPI.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -624,17 +609,6 @@ namespace PassManAPI.Migrations
                     b.Navigation("Credential");
 
                     b.Navigation("Tag");
-                });
-
-            modelBuilder.Entity("PassManAPI.Models.Tag", b =>
-                {
-                    b.HasOne("PassManAPI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Vault", b =>
