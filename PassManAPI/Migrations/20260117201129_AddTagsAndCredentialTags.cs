@@ -16,7 +16,7 @@ namespace PassManAPI.Migrations
                 table: "Vaults",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP",
+                defaultValueSql: "CURRENT_TIMESTAMP(6)",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
                 oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
@@ -26,7 +26,7 @@ namespace PassManAPI.Migrations
                 table: "Credentials",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP",
+                defaultValueSql: "CURRENT_TIMESTAMP(6)",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
                 oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
@@ -36,7 +36,7 @@ namespace PassManAPI.Migrations
                 table: "AuditLogs",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP",
+                defaultValueSql: "CURRENT_TIMESTAMP(6)",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
                 oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
@@ -46,7 +46,7 @@ namespace PassManAPI.Migrations
                 table: "AspNetUsers",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP",
+                defaultValueSql: "CURRENT_TIMESTAMP(6)",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
                 oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
@@ -60,40 +60,40 @@ namespace PassManAPI.Migrations
                 table: "Vaults",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP(6)",
+                defaultValueSql: "CURRENT_TIMESTAMP",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValueSql: "CURRENT_TIMESTAMP");
+                oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "CreatedAt",
                 table: "Credentials",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP(6)",
+                defaultValueSql: "CURRENT_TIMESTAMP",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValueSql: "CURRENT_TIMESTAMP");
+                oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "Timestamp",
                 table: "AuditLogs",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP(6)",
+                defaultValueSql: "CURRENT_TIMESTAMP",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValueSql: "CURRENT_TIMESTAMP");
+                oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
 
             migrationBuilder.AlterColumn<DateTime>(
                 name: "CreatedAt",
                 table: "AspNetUsers",
                 type: "datetime(6)",
                 nullable: false,
-                defaultValueSql: "CURRENT_TIMESTAMP(6)",
+                defaultValueSql: "CURRENT_TIMESTAMP",
                 oldClrType: typeof(DateTime),
                 oldType: "datetime(6)",
-                oldDefaultValueSql: "CURRENT_TIMESTAMP");
+                oldDefaultValueSql: "CURRENT_TIMESTAMP(6)");
         }
     }
 }
