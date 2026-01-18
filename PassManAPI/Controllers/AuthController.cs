@@ -2,47 +2,53 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
-using Google.Apis.Auth;
+using PassManAPI.Services;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.EntityFrameworkCore;
+using Google.Apis.Auth;
 
 namespace PassManAPI.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private const string DefaultRole = "VaultOwner";
     private readonly ApplicationDbContext _db;
-    private readonly UserManager _userManager;
-    private readonly IPasswordHasher<User> _passwordHasher;
-    private readonly ILookupNormalizer _normalizer;
+    private readonly PassManAPI.Managers.UserManager _userManager;
     private readonly Microsoft.AspNetCore.Identity.UserManager<User> _identityUserManager;
+    private readonly SignInManager<User> _signInManager;
+    private readonly IJwtTokenService _jwtTokenService;
     private readonly RoleManager<IdentityRole<int>> _roleManager;
+    private readonly ILookupNormalizer _normalizer;
 
     public AuthController(
         ApplicationDbContext db,
-        UserManager userManager,
-        IPasswordHasher<User> passwordHasher,
-        ILookupNormalizer normalizer,
+        PassManAPI.Managers.UserManager userManager,
         Microsoft.AspNetCore.Identity.UserManager<User> identityUserManager,
-        RoleManager<IdentityRole<int>> roleManager
+        SignInManager<User> signInManager,
+        IJwtTokenService jwtTokenService,
+        RoleManager<IdentityRole<int>> roleManager,
+        ILookupNormalizer normalizer
     )
     {
         _db = db;
         _userManager = userManager;
-        _passwordHasher = passwordHasher;
-        _normalizer = normalizer;
         _identityUserManager = identityUserManager;
+        _signInManager = signInManager;
+        _jwtTokenService = jwtTokenService;
         _roleManager = roleManager;
+        _normalizer = normalizer;
     }
 
     /// <summary>
-    /// Registers a new user. Returns a placeholder token until JWT is added.
+    /// Registers a new user and returns a JWT access token.
     /// </summary>
     [HttpPost("register")]
     [AllowAnonymous]
@@ -78,18 +84,22 @@ public class AuthController : ControllerBase
         }
 
         var roleResult = await AddUserToRoleAsync(identityUser, DefaultRole);
-        if (!roleResult.Success)
+        if (!roleResult.Succeeded)
         {
-            return BadRequest(roleResult.Error);
+            return BadRequest(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
 
-        var token = $"dev-token-{result.Data.Id}";
-        var response = new AuthResponse { AccessToken = token, User = ToProfile(result.Data) };
+        var token = _jwtTokenService.CreateAccessToken(
+            result.Data.Id,
+            result.Data.Email,
+            result.Data.UserName
+        );
+        var response = new AuthResponse(token, ToProfile(result.Data));
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
     }
 
     /// <summary>
-    /// Authenticates a user and returns a placeholder token.
+    /// Authenticates a user and returns a JWT access token.
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
@@ -102,24 +112,39 @@ public class AuthController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var normalizedEmail = _normalizer.NormalizeEmail(request.Email.Trim()) ?? request.Email.Trim().ToUpperInvariant();
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
-        if (user is null || string.IsNullOrWhiteSpace(user.PasswordHash))
+        var email = request.Email.Trim();
+        var user = await _identityUserManager.FindByEmailAsync(email);
+        if (user is null)
         {
             return Unauthorized("Invalid credentials.");
         }
 
-        var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
-        if (verify == PasswordVerificationResult.Failed)
+        if (!await _identityUserManager.IsEmailConfirmedAsync(user))
+        {
+            return Unauthorized("Email not confirmed.");
+        }
+
+        var signInResult = await _signInManager.CheckPasswordSignInAsync(
+            user,
+            request.Password,
+            lockoutOnFailure: true
+        );
+
+        if (signInResult.IsLockedOut)
+        {
+            return StatusCode(StatusCodes.Status423Locked, "Account is locked. Try again later.");
+        }
+
+        if (!signInResult.Succeeded)
         {
             return Unauthorized("Invalid credentials.");
         }
 
         user.LastLoginAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await _identityUserManager.UpdateAsync(user);
 
-        var token = $"dev-token-{user.Id}";
-        return Ok(new AuthResponse { AccessToken = token, User = ToProfile(user) });
+        var token = _jwtTokenService.CreateAccessToken(user);
+        return Ok(new AuthResponse(token, ToProfile(user)));
     }
 
     /// <summary>
@@ -151,7 +176,7 @@ public class AuthController : ControllerBase
                     UserName = payload.Name ?? payload.Email.Split('@')[0],
                     Email = payload.Email,
                     NormalizedEmail = normalizedEmail,
-                    NormalizedUserName = payload.Name?.ToUpperInvariant(),
+                    NormalizedUserName = (payload.Name ?? payload.Email.Split('@')[0]).ToUpperInvariant(),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                     LastLoginAt = DateTime.UtcNow,
@@ -174,8 +199,8 @@ public class AuthController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            var token = $"dev-token-{user.Id}";
-            return Ok(new AuthResponse { AccessToken = token, User = ToProfile(user) });
+            var token = _jwtTokenService.CreateAccessToken(user);
+            return Ok(new AuthResponse(token, ToProfile(user)));
 
         }
         catch (InvalidJwtException ex)
@@ -189,23 +214,25 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the current user's profile using a dev-only X-UserId header.
+    /// Returns the current user's profile using JWT claims.
     /// </summary>
     [HttpGet("me")]
-    [Authorize]
     [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetCurrentUser([FromHeader(Name = "X-UserId")] int? userId)
+    public async Task<IActionResult> GetCurrentUser()
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         var result = await _userManager.GetUserByIdAsync(userId.Value);
         if (!result.Success || result.Data is null)
         {
-            return NotFound("User not found.");
+            // User no longer exists - their token is no longer valid
+            return Unauthorized("User not found or token invalid.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -215,18 +242,18 @@ public class AuthController : ControllerBase
     /// Updates the current user's profile (email/username/phone/encrypted key).
     /// </summary>
     [HttpPut("me")]
-    [Authorize]
     [ProducesResponseType(typeof(UserProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> UpdateProfile(
-        [FromHeader(Name = "X-UserId")] int? userId,
         [FromBody] UpdateProfileRequest request
     )
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         if (!ModelState.IsValid)
@@ -256,14 +283,15 @@ public class AuthController : ControllerBase
     /// Deletes the current user's account.
     /// </summary>
     [HttpDelete("me")]
-    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> DeleteAccount([FromHeader(Name = "X-UserId")] int? userId)
+    public async Task<IActionResult> DeleteAccount()
     {
+        // Resolve user id from JWT claims.
+        var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized("Missing X-UserId header (dev placeholder auth).");
+            return Unauthorized();
         }
 
         var result = await _userManager.DeleteUserAsync(userId.Value);
@@ -275,26 +303,87 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Returns the permissions for the current user (derived from role claims).
-    /// </summary>
-    [HttpGet("permissions")]
-    [Authorize]
-    [ProducesResponseType(typeof(IEnumerable<string>), StatusCodes.Status200OK)]
-    public IActionResult GetPermissions()
-    {
-        var permissions = User.Claims
-            .Where(c => c.Type == PermissionConstants.ClaimType)
-            .Select(c => c.Value)
-            .Distinct()
-            .OrderBy(c => c)
-            .ToArray();
+    private static UserProfileResponse ToProfile(User user) =>
+        new(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.UserName,
+            user.PhoneNumber,
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.LastLoginAt,
+            user.EncryptedVaultKey,
+            null // SubscriptionTierId
+        );
 
-        return Ok(permissions);
+    private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
+        new(
+            user.Id,
+            user.Email,
+            user.UserName,
+            user.PhoneNumber,
+            user.CreatedAt,
+            user.UpdatedAt,
+            user.LastLoginAt,
+            user.EncryptedVaultKey,
+            null // SubscriptionTierId
+        );
+
+    // Reads the authenticated user id from standard JWT claims.
+    private int? GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                    User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (claim is null)
+        {
+            return null;
+        }
+
+        return int.TryParse(claim.Value, out var userId) ? userId : null;
     }
 
     /// <summary>
-    /// Assigns a single role to a user (admin-only).
+    /// Gets all permissions for the current user based on their roles.
+    /// </summary>
+    [HttpGet("permissions")]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPermissions()
+    {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var identityUser = await _identityUserManager.FindByIdAsync(userId.Value.ToString());
+        if (identityUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var roles = await _identityUserManager.GetRolesAsync(identityUser);
+        var permissions = new HashSet<string>();
+
+        foreach (var roleName in roles)
+        {
+            var role = await _roleManager.FindByNameAsync(roleName);
+            if (role != null)
+            {
+                var roleClaims = await _roleManager.GetClaimsAsync(role);
+                foreach (var claim in roleClaims.Where(c => c.Type == "permission"))
+                {
+                    permissions.Add(claim.Value);
+                }
+            }
+        }
+
+        return Ok(permissions.ToList());
+    }
+
+    /// <summary>
+    /// Assigns a role to a user, replacing any existing roles (Admin only).
     /// </summary>
     [HttpPost("assign-role")]
     [Authorize(Policy = PermissionConstants.RoleManage)]
@@ -303,115 +392,59 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignRole([FromBody] AssignRoleRequest request)
     {
-        var user = await _identityUserManager.FindByIdAsync(request.UserId.ToString());
-        if (user is null)
+        var identityUser = await _identityUserManager.FindByIdAsync(request.UserId.ToString());
+        if (identityUser == null)
         {
-            return NotFound($"User {request.UserId} not found.");
+            return NotFound("User not found.");
         }
 
-        var exists = await _roleManager.RoleExistsAsync(request.Role);
-        if (!exists)
+        var role = await _roleManager.FindByNameAsync(request.RoleName);
+        if (role == null)
         {
-            return BadRequest($"Role '{request.Role}' does not exist.");
+            return BadRequest($"Role '{request.RoleName}' does not exist.");
         }
 
-        var currentRoles = await _identityUserManager.GetRolesAsync(user);
-        if (currentRoles.Count > 0)
+        // Remove existing roles before assigning the new one
+        var currentRoles = await _identityUserManager.GetRolesAsync(identityUser);
+        if (currentRoles.Any())
         {
-            var removeResult = await _identityUserManager.RemoveFromRolesAsync(user, currentRoles);
-            if (!removeResult.Succeeded)
-            {
-                return BadRequest($"Failed to remove existing roles: {string.Join(", ", removeResult.Errors.Select(e => e.Description))}");
-            }
+            await _identityUserManager.RemoveFromRolesAsync(identityUser, currentRoles);
         }
 
-        var addResult = await _identityUserManager.AddToRoleAsync(user, request.Role);
-        if (!addResult.Succeeded)
-        {
-            return BadRequest($"Failed to assign role: {string.Join(", ", addResult.Errors.Select(e => e.Description))}");
-        }
-
-        var actorId = GetCurrentUserId();
-        if (actorId.HasValue)
-        {
-            await LogAuditAsync(AuditAction.UserRoleChanged, actorId.Value, $"Assigned role '{request.Role}' to user {request.UserId}");
-        }
-
-        return Ok(new RoleAssignmentResponse { UserId = request.UserId, Role = request.Role });
-    }
-
-    private async Task LogAuditAsync(AuditAction action, int actorUserId, string? details = null)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = "User",
-            EntityId = actorUserId,
-            UserId = actorUserId,
-            Details = details,
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
-    }
-
-    private int? GetCurrentUserId()
-    {
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out var id) ? id : null;
-    }
-
-    private static UserProfileResponse ToProfile(User user) =>
-        new()
-        {
-            Id = user.Id,
-            Email = user.Email ?? string.Empty,
-            UserName = user.UserName,
-            PhoneNumber = user.PhoneNumber,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt,
-            LastLoginAt = user.LastLoginAt,
-            EncryptedVaultKey = user.EncryptedVaultKey,
-            SubscriptionTierId = user.SubscriptionTierId
-        };
-
-    private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
-        new()
-        {
-            Id = user.Id,
-            Email = user.Email,
-            UserName = user.UserName,
-            PhoneNumber = user.PhoneNumber,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt,
-            LastLoginAt = user.LastLoginAt,
-            EncryptedVaultKey = user.EncryptedVaultKey,
-            SubscriptionTierId = user.SubscriptionTierId
-        };
-
-    private async Task<(bool Success, string? Error)> AddUserToRoleAsync(User user, string roleName)
-    {
-        var exists = await _roleManager.RoleExistsAsync(roleName);
-        if (!exists)
-        {
-            return (false, $"Role '{roleName}' does not exist.");
-        }
-
-        var result = await _identityUserManager.AddToRoleAsync(user, roleName);
+        var result = await AddUserToRoleAsync(identityUser, request.RoleName);
         if (!result.Succeeded)
         {
-            return (false, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        return (true, null);
+        return Ok(new { Message = $"User assigned to role '{request.RoleName}' successfully." });
     }
 
-    public class AssignRoleRequest
+    /// <summary>
+    /// Helper: add user to role, creating the role if missing.
+    /// </summary>
+    private async Task<IdentityResult> AddUserToRoleAsync(User user, string roleName)
     {
-        [Required]
-        public int UserId { get; set; }
-
-        [Required]
-        [StringLength(100)]
-        public string Role { get; set; } = string.Empty;
+        if (!await _roleManager.RoleExistsAsync(roleName))
+        {
+            await _roleManager.CreateAsync(new IdentityRole<int>(roleName));
+        }
+        return await _identityUserManager.AddToRoleAsync(user, roleName);
     }
 }
+
+/// <summary>
+/// Request for assigning a role to a user.
+/// </summary>
+public record AssignRoleRequest
+{
+    public int UserId { get; init; }
+    
+    [System.Text.Json.Serialization.JsonPropertyName("role")]
+    public string RoleName { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Request for Google OAuth login.
+/// </summary>
+public record GoogleLoginRequest(string IdToken);
