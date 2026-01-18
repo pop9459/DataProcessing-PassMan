@@ -84,9 +84,9 @@ public class AuthController : ControllerBase
         }
 
         var roleResult = await AddUserToRoleAsync(identityUser, DefaultRole);
-        if (!roleResult.Success)
+        if (!roleResult.Succeeded)
         {
-            return BadRequest(roleResult.Error);
+            return BadRequest(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
 
         var token = _jwtTokenService.CreateAccessToken(
@@ -231,7 +231,8 @@ public class AuthController : ControllerBase
         var result = await _userManager.GetUserByIdAsync(userId.Value);
         if (!result.Success || result.Data is null)
         {
-            return NotFound("User not found.");
+            // User no longer exists - their token is no longer valid
+            return Unauthorized("User not found or token invalid.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -311,7 +312,8 @@ public class AuthController : ControllerBase
             user.CreatedAt,
             user.UpdatedAt,
             user.LastLoginAt,
-            user.EncryptedVaultKey
+            user.EncryptedVaultKey,
+            null // SubscriptionTierId
         );
 
     private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
@@ -323,7 +325,8 @@ public class AuthController : ControllerBase
             user.CreatedAt,
             user.UpdatedAt,
             user.LastLoginAt,
-            user.EncryptedVaultKey
+            user.EncryptedVaultKey,
+            null // SubscriptionTierId
         );
 
     // Reads the authenticated user id from standard JWT claims.
@@ -380,10 +383,10 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Assigns a role to a user (Admin only).
+    /// Assigns a role to a user, replacing any existing roles (Admin only).
     /// </summary>
     [HttpPost("assign-role")]
-    [Authorize(Policy = "admin.manage")]
+    [Authorize(Policy = PermissionConstants.RoleManage)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -399,6 +402,13 @@ public class AuthController : ControllerBase
         if (role == null)
         {
             return BadRequest($"Role '{request.RoleName}' does not exist.");
+        }
+
+        // Remove existing roles before assigning the new one
+        var currentRoles = await _identityUserManager.GetRolesAsync(identityUser);
+        if (currentRoles.Any())
+        {
+            await _identityUserManager.RemoveFromRolesAsync(identityUser, currentRoles);
         }
 
         var result = await AddUserToRoleAsync(identityUser, request.RoleName);
@@ -426,7 +436,13 @@ public class AuthController : ControllerBase
 /// <summary>
 /// Request for assigning a role to a user.
 /// </summary>
-public record AssignRoleRequest(int UserId, string RoleName);
+public record AssignRoleRequest
+{
+    public int UserId { get; init; }
+    
+    [System.Text.Json.Serialization.JsonPropertyName("role")]
+    public string RoleName { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// Request for Google OAuth login.

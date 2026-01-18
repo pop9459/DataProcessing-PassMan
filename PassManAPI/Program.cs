@@ -85,12 +85,24 @@ public class Program
         builder.Services.Configure<JwtOptions>(jwtSection);
         var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
 
-        // Authentication: JWT Bearer as primary, with fallback to DevHeader for backward compat
+        // Authentication: JWT Bearer as primary, with DevHeader for test backward compat
+        // Use policy scheme in Test environment to auto-select based on Authorization header
+        var isTestEnv = builder.Environment.IsEnvironment("Test");
+        
         builder.Services
             .AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                if (isTestEnv)
+                {
+                    // In Test, use a policy that selects scheme based on Authorization header
+                    options.DefaultAuthenticateScheme = "SmartScheme";
+                    options.DefaultChallengeScheme = "SmartScheme";
+                }
+                else
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                }
             })
             .AddJwtBearer(options =>
             {
@@ -110,7 +122,21 @@ public class Program
             })
             .AddScheme<AuthenticationSchemeOptions, DevHeaderAuthenticationHandler>(
                 DevHeaderAuthenticationHandler.Scheme,
-                _ => { });
+                _ => { })
+            .AddPolicyScheme("SmartScheme", "Smart Auth Scheme", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    // If Authorization header contains Bearer token, use JWT
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return JwtBearerDefaults.AuthenticationScheme;
+                    }
+                    // Otherwise fall back to DevHeader for test backward compatibility
+                    return DevHeaderAuthenticationHandler.Scheme;
+                };
+            });
 
         // JWT Token Service for generating tokens
         builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
