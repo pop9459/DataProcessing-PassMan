@@ -16,6 +16,7 @@ namespace PassManAPI.Data
         public DbSet<Category> Categories { get; set; }
         public DbSet<VaultShare> VaultShares { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Attachment> Attachments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -90,6 +91,19 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Attachment configurations
+            modelBuilder
+                .Entity<Attachment>()
+                .HasOne(a => a.Credential)
+                .WithMany(c => c.Attachments)
+                .HasForeignKey(a => a.CredentialId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Attachment>()
+                .Property(a => a.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Seed default categories

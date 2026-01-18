@@ -41,5 +41,8 @@ namespace PassManAPI.Models
 
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
+
+        // Navigation property for attachments
+        public virtual ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
     }
 }
