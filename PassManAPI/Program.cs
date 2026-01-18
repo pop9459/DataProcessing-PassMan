@@ -3,8 +3,13 @@ namespace PassManAPI;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using PassManAPI.Data;
 using PassManAPI.Models;
 using PassManAPI.Controllers;
@@ -75,16 +80,66 @@ public class Program
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
-        // Authentication/Authorization (place after AddIdentity so defaults are not overridden by Identity)
+        // JWT configuration
+        var jwtSection = builder.Configuration.GetSection("Jwt");
+        builder.Services.Configure<JwtOptions>(jwtSection);
+        var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+
+        // Authentication: JWT Bearer as primary, with DevHeader for test backward compat
+        // Use policy scheme in Test environment to auto-select based on Authorization header
+        var isTestEnv = builder.Environment.IsEnvironment("Test");
+        
         builder.Services
             .AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = DevHeaderAuthenticationHandler.Scheme;
-                options.DefaultChallengeScheme = DevHeaderAuthenticationHandler.Scheme;
+                if (isTestEnv)
+                {
+                    // In Test, use a policy that selects scheme based on Authorization header
+                    options.DefaultAuthenticateScheme = "SmartScheme";
+                    options.DefaultChallengeScheme = "SmartScheme";
+                }
+                else
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                }
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtOptions.Issuer,
+                    ValidAudience = jwtOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtOptions.SigningKey)
+                    ),
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
             })
             .AddScheme<AuthenticationSchemeOptions, DevHeaderAuthenticationHandler>(
                 DevHeaderAuthenticationHandler.Scheme,
-                _ => { });
+                _ => { })
+            .AddPolicyScheme("SmartScheme", "Smart Auth Scheme", options =>
+            {
+                options.ForwardDefaultSelector = context =>
+                {
+                    // If Authorization header contains Bearer token, use JWT
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return JwtBearerDefaults.AuthenticationScheme;
+                    }
+                    // Otherwise fall back to DevHeader for test backward compatibility
+                    return DevHeaderAuthenticationHandler.Scheme;
+                };
+            });
+
+        // JWT Token Service for generating tokens
+        builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         builder.Services.AddAuthorization(options =>
         {
@@ -92,7 +147,7 @@ public class Program
             {
                 options.AddPolicy(permission, policy =>
                 {
-                    policy.AddAuthenticationSchemes(DevHeaderAuthenticationHandler.Scheme);
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, DevHeaderAuthenticationHandler.Scheme);
                     policy.RequireAuthenticatedUser();
                     policy.RequireClaim(PermissionConstants.ClaimType, permission);
                 });
@@ -123,7 +178,7 @@ public class Program
         builder.Services.AddScoped<IVaultManager, VaultManager>();
 
         // Register Security Services
-        // JWT Token Service
+        // Additional JWT Token Service (TokenService from Services folder)
         builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
         builder.Services.AddScoped<ITokenService, TokenService>();
 
@@ -198,6 +253,31 @@ public class Program
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
         {
+            // Add JWT security scheme to Swagger JSON
+            app.Use(async (context, next) =>
+            {
+                if (!context.Request.Path.Equals("/swagger/v1/swagger.json"))
+                {
+                    await next();
+                    return;
+                }
+
+                var originalBody = context.Response.Body;
+                await using var buffer = new MemoryStream();
+                context.Response.Body = buffer;
+
+                await next();
+
+                buffer.Position = 0;
+                using var reader = new StreamReader(buffer);
+                var json = await reader.ReadToEndAsync();
+                var updated = AddJwtSecurityToSwagger(json);
+
+                context.Response.Body = originalBody;
+                context.Response.ContentLength = Encoding.UTF8.GetByteCount(updated);
+                await context.Response.WriteAsync(updated);
+            });
+
             app.UseSwagger();
             app.UseSwaggerUI();
         }
@@ -215,5 +295,37 @@ public class Program
         app.MapControllers();
 
         app.Run();
+    }
+
+    private static string AddJwtSecurityToSwagger(string json)
+    {
+        var root = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
+
+        var components = root["components"] as JsonObject ?? new JsonObject();
+        var securitySchemes = components["securitySchemes"] as JsonObject ?? new JsonObject();
+
+        securitySchemes["Bearer"] = new JsonObject
+        {
+            ["type"] = "http",
+            ["scheme"] = "bearer",
+            ["bearerFormat"] = "JWT",
+            ["description"] = "Enter: Bearer {token}"
+        };
+
+        components["securitySchemes"] = securitySchemes;
+        root["components"] = components;
+
+        root["security"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["Bearer"] = new JsonArray()
+            }
+        };
+
+        return root.ToJsonString(new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
     }
 }
