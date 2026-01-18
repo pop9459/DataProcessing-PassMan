@@ -96,6 +96,20 @@ namespace PassManAPI.Data
 
             modelBuilder
                 .Entity<AuditLog>()
+                .HasOne(al => al.Vault)
+                .WithMany(v => v.AuditLogs)
+                .HasForeignKey(al => al.VaultId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder
+                .Entity<AuditLog>()
+                .HasOne(al => al.Credential)
+                .WithMany(c => c.AuditLogs)
+                .HasForeignKey(al => al.CredentialId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder
+                .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
                 .HasDefaultValueSql(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)");
 
