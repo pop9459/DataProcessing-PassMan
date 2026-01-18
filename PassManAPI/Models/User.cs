@@ -15,9 +15,20 @@ namespace PassManAPI.Models
         public DateTime? LastLoginAt { get; set; }
         public string? EncryptedVaultKey { get; set; }
 
+        /// <summary>
+        /// Base32-encoded TOTP secret for 2FA authentication.
+        /// </summary>
+        public string? TotpSecret { get; set; }
+
+        /// <summary>
+        /// Link to the user's subscription tier.
+        /// </summary>
+        public Guid? SubscriptionTierId { get; set; }
+
         // Navigation properties
         public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
         public virtual ICollection<VaultShare> SharedVaults { get; set; } = new List<VaultShare>();
         public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+        public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
     }
 }

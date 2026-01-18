@@ -28,7 +28,8 @@ public record UserResponse(
     DateTime CreatedAt,
     DateTime? UpdatedAt,
     DateTime? LastLoginAt,
-    string? EncryptedVaultKey
+    string? EncryptedVaultKey,
+    Guid? SubscriptionTierId
 );
 
 public class UserOperationResult<T>
@@ -208,7 +209,8 @@ public class UserManager
             user.CreatedAt,
             user.UpdatedAt,
             user.LastLoginAt,
-            user.EncryptedVaultKey
+            user.EncryptedVaultKey,
+            user.SubscriptionTierId
         );
 }
 

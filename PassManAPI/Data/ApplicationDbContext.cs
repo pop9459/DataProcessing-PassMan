@@ -11,6 +11,7 @@ namespace PassManAPI.Data
             : base(options) { }
 
         // Core DbSets
+        // Core DbSets
         public DbSet<Vault> Vaults { get; set; }
         public DbSet<Credential> Credentials { get; set; }
         public DbSet<Category> Categories { get; set; }
@@ -18,6 +19,8 @@ namespace PassManAPI.Data
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Attachment> Attachments { get; set; }
         public DbSet<Invitation> Invitations { get; set; }
+        public DbSet<Tag> Tags { get; set; }
+        public DbSet<CredentialTag> CredentialTags { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -46,6 +49,11 @@ namespace PassManAPI.Data
                 .Entity<Vault>()
                 .Property(v => v.CreatedAt)
                 .HasDefaultValueSql(timestampSql);
+
+            // Global query filter for soft delete - automatically excludes deleted vaults
+            modelBuilder
+                .Entity<Vault>()
+                .HasQueryFilter(v => !v.IsDeleted);
 
             // Credential configurations
             modelBuilder
@@ -94,6 +102,20 @@ namespace PassManAPI.Data
 
             modelBuilder
                 .Entity<AuditLog>()
+                .HasOne(al => al.Vault)
+                .WithMany(v => v.AuditLogs)
+                .HasForeignKey(al => al.VaultId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder
+                .Entity<AuditLog>()
+                .HasOne(al => al.Credential)
+                .WithMany(c => c.AuditLogs)
+                .HasForeignKey(al => al.CredentialId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder
+                .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
                 .HasDefaultValueSql(timestampSql);
 
@@ -126,6 +148,29 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Invitation>()
                 .HasIndex(i => new { i.VaultId, i.InvitedEmail });
+
+            // Tag configurations
+            modelBuilder
+                .Entity<Tag>()
+                .HasIndex(t => t.Name)
+                .IsUnique();
+
+            // CredentialTag configurations (composite key for many-to-many)
+            modelBuilder.Entity<CredentialTag>().HasKey(ct => new { ct.CredentialId, ct.TagId });
+
+            modelBuilder
+                .Entity<CredentialTag>()
+                .HasOne(ct => ct.Credential)
+                .WithMany(c => c.CredentialTags)
+                .HasForeignKey(ct => ct.CredentialId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<CredentialTag>()
+                .HasOne(ct => ct.Tag)
+                .WithMany(t => t.CredentialTags)
+                .HasForeignKey(ct => ct.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);

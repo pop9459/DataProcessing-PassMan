@@ -15,6 +15,9 @@
 *.sln.docstates
 .env
 
+# Lock files
+*.lock
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

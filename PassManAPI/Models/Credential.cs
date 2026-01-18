@@ -44,5 +44,11 @@ namespace PassManAPI.Models
 
         // Navigation property for attachments
         public virtual ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
+
+        // Navigation property for many-to-many relationship with Tags
+        public virtual ICollection<CredentialTag> CredentialTags { get; set; } = new List<CredentialTag>();
+
+        // Navigation property for audit logs linked to this credential
+        public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
     }
 }

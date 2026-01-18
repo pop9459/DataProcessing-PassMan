@@ -1,5 +1,7 @@
 namespace PassManAPI;
 
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +10,9 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
+using PassManAPI.Middleware;
+using PassManAPI.Services;
+using PassManAPI.Validators;
 
 public class Program
 {
@@ -86,7 +91,11 @@ public class Program
             foreach (var permission in PermissionConstants.All)
             {
                 options.AddPolicy(permission, policy =>
-                    policy.RequireClaim(PermissionConstants.ClaimType, permission));
+                {
+                    policy.AddAuthenticationSchemes(DevHeaderAuthenticationHandler.Scheme);
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission);
+                });
             }
         });
 
@@ -110,7 +119,38 @@ public class Program
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
 
+        // Register VaultManager for vault business logic
+        builder.Services.AddScoped<IVaultManager, VaultManager>();
+
+        // Register Security Services
+        // JWT Token Service
+        builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+        builder.Services.AddScoped<ITokenService, TokenService>();
+
+        // Password Encryption Service (AES-256-GCM)
+        builder.Services.AddSingleton<IPasswordEncryptionService, PasswordEncryptionService>();
+
+        // Two-Factor Authentication Service (TOTP)
+        builder.Services.AddSingleton<ITwoFactorService, TwoFactorService>();
+
+        // Breach Check Service (Have I Been Pwned)
+        builder.Services.Configure<BreachCheckSettings>(builder.Configuration.GetSection(BreachCheckSettings.SectionName));
+        builder.Services.AddHttpClient<IBreachCheckService, BreachCheckService>();
+
+        // Register Business Managers
+        builder.Services.AddScoped<ISharingManager, SharingManager>();
+        builder.Services.AddScoped<IAuthManager, AuthManager>();
+        builder.Services.AddScoped<ICredentialManager, CredentialManager>();
+        builder.Services.AddScoped<IAuditService, AuditManager>();
+
+        // FluentValidation - auto-validate request models
+        builder.Services.AddFluentValidationAutoValidation();
+        builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
+
         var app = builder.Build();
+
+        // Global exception handler middleware (must be early in pipeline)
+        app.UseGlobalExceptionHandler();
 
         using (var scope = app.Services.CreateScope())
         {
