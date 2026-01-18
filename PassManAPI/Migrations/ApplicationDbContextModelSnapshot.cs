@@ -205,7 +205,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("VaultId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Category", b =>
@@ -227,7 +227,7 @@ namespace PassManAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
 
                     b.HasData(
                         new
@@ -331,7 +331,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("VaultId");
 
-                    b.ToTable("Credentials");
+                    b.ToTable("Credentials", (string)null);
                 });
 
             modelBuilder.Entity("PassManAPI.Models.CredentialTag", b =>
@@ -348,7 +348,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("TagId");
 
-                    b.ToTable("CredentialTags");
+                    b.ToTable("CredentialTags", (string)null);
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
@@ -374,7 +374,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Tags");
+                    b.ToTable("Tags", (string)null);
                 });
 
             modelBuilder.Entity("PassManAPI.Models.User", b =>
@@ -506,7 +506,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Vaults");
+                    b.ToTable("Vaults", (string)null);
                 });
 
             modelBuilder.Entity("PassManAPI.Models.VaultShare", b =>
@@ -534,7 +534,7 @@ namespace PassManAPI.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("VaultShares");
+                    b.ToTable("VaultShares", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
