@@ -17,6 +17,7 @@ namespace PassManAPI.Data
         public DbSet<VaultShare> VaultShares { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Attachment> Attachments { get; set; }
+        public DbSet<Invitation> Invitations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -105,6 +106,23 @@ namespace PassManAPI.Data
                 .Entity<Attachment>()
                 .Property(a => a.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Invitation configurations
+            modelBuilder
+                .Entity<Invitation>()
+                .HasOne(i => i.Vault)
+                .WithMany(v => v.Invitations)
+                .HasForeignKey(i => i.VaultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Invitation>()
+                .HasIndex(i => i.InviteToken)
+                .IsUnique();
+
+            modelBuilder
+                .Entity<Invitation>()
+                .HasIndex(i => new { i.VaultId, i.InvitedEmail });
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
