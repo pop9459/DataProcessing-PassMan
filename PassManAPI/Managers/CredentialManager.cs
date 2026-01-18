@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
+using PassManAPI.DTOs;
 using PassManAPI.Models;
 
 namespace PassManAPI.Managers;

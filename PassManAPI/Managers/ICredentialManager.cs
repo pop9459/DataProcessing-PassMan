@@ -1,3 +1,5 @@
+using PassManAPI.DTOs;
+
 namespace PassManAPI.Managers;
 
 /// <summary>
