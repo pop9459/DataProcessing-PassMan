@@ -388,7 +388,6 @@ namespace PassManAPI.Migrations
                     b.ToTable("CredentialTags");
                 });
 
-<<<<<<< HEAD
             modelBuilder.Entity("PassManAPI.Models.SubscriptionTier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -440,46 +439,6 @@ namespace PassManAPI.Migrations
                             Name = "Premium",
                             Price = 9.99m
                         });
-=======
-            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("AcceptedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("InviteToken")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("InvitedEmail")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VaultId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InviteToken")
-                        .IsUnique();
-
-                    b.HasIndex("VaultId", "InvitedEmail");
-
-                    b.ToTable("Invitations");
->>>>>>> origin/develop
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
