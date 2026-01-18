@@ -5,31 +5,7 @@
 @inject NavigationManager Navigation
 @using PassManGUI.Services
 @using PassManGUI.Models
-
-@* 
-    Vault Detail Page - Displays items within a specific vault
-    
-    Status: ✅ Connected to API via ApiService and AuthService
-    
-    TODO:
-    1. Implement item actions
-       - Add new item (modal/page)
-       - Edit item (modal/inline)
-       - Delete item (confirmation dialog)
-       - Copy password to clipboard
-       - View password (toggle visibility)
-    
-    2. Add search/filter functionality
-       - Search items by name/username
-       - Filter by category/type
-       - Sort options (name, date, etc.)
-    
-    3. Vault settings
-       - Edit vault name/description
-       - Delete vault
-       - Share vault with users
-       - Export vault data
-*@
+@using PassManGUI.Components.Shared
 
 <PageTitle>@vaultName - PassMan</PageTitle>
 
@@ -47,16 +23,22 @@
                     </a>
                 </div>
                 
-                <div class="header-content">
+            <div class="header-content">
                     <div class="header-left">
                         <div class="vault-info">
-                            <h1>@vaultName</h1>
+                            <h1>
+                                @if (!string.IsNullOrEmpty(vaultIcon))
+                                {
+                                    <span class="vault-header-icon">@vaultIcon</span>
+                                }
+                                @vaultName
+                            </h1>
                             <p>@vaultDescription</p>
                         </div>
                     </div>
                     <div class="header-right">
-                        <button class="btn-secondary">Vault Settings</button>
-                        <button class="btn-primary" @onclick="AddItem">+ Add Item</button>
+                        <button class="btn-secondary" @onclick="GoToSettings">Vault Settings</button>
+                        <button class="btn-primary" @onclick="AddItem">+ New Item</button>
                     </div>
                 </div>
             </div>
@@ -99,7 +81,7 @@
                         <div class="items-list">
                             @foreach (var item in items)
                             {
-                                <div class="item-card" @onclick="() => OpenItem(item.Id)">
+                                <div class="item-card" @onclick="() => OpenItem(item)">
                                     <div class="item-card-content">
                                         <div class="item-header">
                                             <h3>@item.Name</h3>
@@ -135,17 +117,33 @@
     </div>
 </div>
 
+<!-- Item Panel (slide-in from right) -->
+<ItemPanel 
+    IsVisible="isPanelVisible"
+    Item="selectedItem"
+    IsNewItem="isCreatingNewItem"
+    VaultId="VaultId"
+    OnSave="HandleItemSave"
+    OnDelete="HandleItemDelete"
+    OnClose="ClosePanel" />
+
 @code {
     [Parameter]
     public int VaultId { get; set; }
     
     private string vaultName = "";
     private string vaultDescription = "";
+    private string vaultIcon = "";
     private List<VaultItemModel> items = new();
     private bool isLoading = true;
     private string errorMessage = string.Empty;
     private bool isAuthenticated = false;
     private bool hasCheckedAuth = false;
+    
+    // Panel state
+    private bool isPanelVisible = false;
+    private VaultItemModel? selectedItem = null;
+    private bool isCreatingNewItem = false;
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -183,6 +181,7 @@
             {
                 vaultName = vaultResult.Data.Name;
                 vaultDescription = vaultResult.Data.Description ?? "";
+                vaultIcon = vaultResult.Data.Icon ?? "";
             }
             else
             {
@@ -215,13 +214,91 @@
     
     private void AddItem()
     {
-        // TODO: Implement add item modal/page
-        Console.WriteLine("Add item clicked");
+        selectedItem = new VaultItemModel
+        {
+            Title = "",
+            Username = "",
+            Password = "",
+            Url = "",
+            Notes = "",
+            CreatedAt = DateTime.UtcNow
+        };
+        isCreatingNewItem = true;
+        isPanelVisible = true;
+        StateHasChanged();
     }
     
-    private void OpenItem(int itemId)
+    private void OpenItem(VaultItemModel item)
     {
-        // TODO: Implement item detail view/modal
-        Console.WriteLine($"Open item {itemId}");
+        selectedItem = item;
+        isCreatingNewItem = false;
+        isPanelVisible = true;
+        StateHasChanged();
+    }
+    
+    private void ClosePanel()
+    {
+        isPanelVisible = false;
+        selectedItem = null;
+        isCreatingNewItem = false;
+        StateHasChanged();
+    }
+    
+    private async Task HandleItemSave(VaultItemModel item)
+    {
+        if (isCreatingNewItem)
+        {
+            // Create new item
+            var request = new CreateVaultItemRequest
+            {
+                Title = item.Title,
+                Username = item.Username,
+                EncryptedPassword = item.Password,
+                Url = item.Url,
+                Notes = item.Notes
+            };
+            
+            var result = await ApiService.CreateVaultItemAsync(VaultId, request);
+            if (result.Success)
+            {
+                await LoadVaultItems();
+                ClosePanel();
+            }
+        }
+        else
+        {
+            // Update existing item
+            var request = new UpdateVaultItemRequest
+            {
+                Title = item.Title,
+                Username = item.Username,
+                EncryptedPassword = item.Password,
+                Url = item.Url,
+                Notes = item.Notes
+            };
+            
+            var result = await ApiService.UpdateVaultItemAsync(VaultId, item.Id, request);
+            if (result.Success)
+            {
+                await LoadVaultItems();
+                ClosePanel();
+            }
+        }
+    }
+    
+    private async Task HandleItemDelete(VaultItemModel item)
+    {
+        var result = await ApiService.DeleteVaultItemAsync(VaultId, item.Id);
+        if (result.Success)
+        {
+            await LoadVaultItems();
+            ClosePanel();
+        }
+    }
+
+    private void GoToSettings()
+    {
+        // TODO: Implement Vault Settings Modal
+        Console.WriteLine("Navigate to vault settings");
     }
 }

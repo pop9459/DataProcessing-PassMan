@@ -1,1 +1,89 @@
-﻿@* NavMenu - Add your custom navigation here *@
+﻿@inject NavigationManager Navigation
+@inject AuthService AuthService
+@using PassManGUI.Services
+@using PassManGUI.Models
+@implements IDisposable
+
+<div class="nav-container">
+    <div class="brand">
+        <div class="brand-logo">🔐</div>
+        <div class="brand-text">
+            <h1>PassMan</h1>
+            <p>Secure Vault</p>
+        </div>
+    </div>
+
+    @if (AuthService.CurrentUser != null)
+    {
+        <div class="nav-links">
+            <NavLink class="nav-link" href="vaults" Match="NavLinkMatch.Prefix" @onclick="HandleLinkClick">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.62-2.05a20.03 20.03 0 0118.76 0L22 17v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                My Vaults
+            </NavLink>
+            <NavLink class="nav-link" href="settings" Match="NavLinkMatch.Prefix" @onclick="HandleLinkClick">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Settings
+            </NavLink>
+        </div>
+
+        <div class="user-menu">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    @(AuthService.CurrentUser.UserName?.Substring(0, 1).ToUpper() ?? "U")
+                </div>
+                <div class="user-info">
+                    <div class="user-name">@AuthService.CurrentUser.UserName</div>
+                    <div class="user-email">@AuthService.CurrentUser.Email</div>
+                </div>
+            </div>
+            
+            <button class="btn-logout" @onclick="Logout">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Sign Out
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="auth-message">
+            <p>Please sign in to access your vaults.</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnLinkClick { get; set; }
+
+    private async Task HandleLinkClick()
+    {
+        if (OnLinkClick.HasDelegate)
+        {
+            await OnLinkClick.InvokeAsync();
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+    
+    // Subscribe to auth state changes to update UI
+    protected override void OnInitialized()
+    {
+        AuthService.OnAuthStateChanged += StateHasChanged;
+    }
+    
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= StateHasChanged;
+    }
+}

@@ -1,0 +1,194 @@
+@using PassManGUI.Models
+
+@if (IsVisible)
+{
+    <div class="modal-overlay" @onclick="OnOverlayClick">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2>@(IsEditMode ? "Edit Vault" : "Create New Vault")</h2>
+                <button class="modal-close" @onclick="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="error-message">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                        </svg>
+                        <span>@ErrorMessage</span>
+                    </div>
+                }
+                
+                <div class="form-group">
+                    <label for="vaultName">Vault Name *</label>
+                    <input 
+                        type="text" 
+                        id="vaultName" 
+                        @bind="VaultName" 
+                        @bind:event="oninput"
+                        placeholder="My Personal Vault"
+                        maxlength="100"
+                        class="@(string.IsNullOrWhiteSpace(VaultName) && hasAttemptedSubmit ? "input-error" : "")" />
+                    @if (string.IsNullOrWhiteSpace(VaultName) && hasAttemptedSubmit)
+                    {
+                        <span class="validation-error">Vault name is required</span>
+                    }
+                </div>
+                
+                <div class="form-group">
+                    <label for="vaultDescription">Description (optional)</label>
+                    <textarea 
+                        id="vaultDescription" 
+                        @bind="VaultDescription" 
+                        placeholder="A secure place for my passwords..."
+                        rows="3"
+                        maxlength="500"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Icon (optional)</label>
+                    <div class="icon-picker">
+                        @foreach (var icon in AvailableIcons)
+                        {
+                            <button 
+                                type="button" 
+                                class="icon-option @( (VaultIcon == icon || (icon == "🚫" && string.IsNullOrEmpty(VaultIcon))) ? "selected" : "")"
+                                @onclick="() => SelectIcon(icon)">
+                                @icon
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" @onclick="Close" disabled="@IsSaving">Cancel</button>
+                <button class="btn-primary" @onclick="Save" disabled="@IsSaving">
+                    @if (IsSaving)
+                    {
+                        <span class="spinner-small"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>@(IsEditMode ? "Save Changes" : "Create Vault")</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public bool IsEditMode { get; set; }
+    [Parameter] public VaultResponse? ExistingVault { get; set; }
+    [Parameter] public EventCallback<VaultFormData> OnSave { get; set; }
+    
+    private string VaultName { get; set; } = "";
+    private string VaultDescription { get; set; } = "";
+    private string? VaultIcon { get; set; }
+    private string ErrorMessage { get; set; } = "";
+    private bool IsSaving { get; set; }
+    private bool hasAttemptedSubmit;
+    
+    private readonly string[] AvailableIcons = new[] 
+    { 
+        "🚫", "🔐", "💼", "🏠", "💰", "🎮", "📧", "🌐", "🔑", "🛡️", "📱",
+        "💳", "🏦", "📁", "🔒", "⭐"
+    };
+    
+    protected override void OnParametersSet()
+    {
+        if (IsVisible && IsEditMode && ExistingVault != null)
+        {
+            VaultName = ExistingVault.Name;
+            VaultDescription = ExistingVault.Description ?? "";
+            VaultIcon = ExistingVault.Icon;
+        }
+        else if (IsVisible && !IsEditMode)
+        {
+            // Reset form for new vault
+            VaultName = "";
+            VaultDescription = "";
+            VaultIcon = null; // Default to "No Icon" (🚫)
+            ErrorMessage = "";
+            hasAttemptedSubmit = false;
+        }
+    }
+    
+    private void SelectIcon(string icon)
+    {
+        if (icon == "🚫")
+        {
+            VaultIcon = null;
+        }
+        else
+        {
+            VaultIcon = icon;
+        }
+    }
+    
+    private async Task Close()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+        ErrorMessage = "";
+        hasAttemptedSubmit = false;
+    }
+    
+    private void OnOverlayClick()
+    {
+        if (!IsSaving)
+        {
+            _ = Close();
+        }
+    }
+    
+    private async Task Save()
+    {
+        hasAttemptedSubmit = true;
+        ErrorMessage = "";
+        
+        if (string.IsNullOrWhiteSpace(VaultName))
+        {
+            return;
+        }
+        
+        IsSaving = true;
+        
+        try
+        {
+            var formData = new VaultFormData
+            {
+                Name = VaultName.Trim(),
+                Description = string.IsNullOrWhiteSpace(VaultDescription) ? null : VaultDescription.Trim(),
+                Icon = VaultIcon
+            };
+            
+            await OnSave.InvokeAsync(formData);
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+    
+    public class VaultFormData
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string? Icon { get; set; }
+    }
+}
