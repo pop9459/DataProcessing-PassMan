@@ -327,7 +327,7 @@ public class AuthController : ControllerBase
             UpdatedAt = user.UpdatedAt,
             LastLoginAt = user.LastLoginAt,
             EncryptedVaultKey = user.EncryptedVaultKey,
-            SubscriptionTierId = null
+            SubscriptionTierId = user.SubscriptionTierId
         };
 
     private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
@@ -341,7 +341,7 @@ public class AuthController : ControllerBase
             UpdatedAt = user.UpdatedAt,
             LastLoginAt = user.LastLoginAt,
             EncryptedVaultKey = user.EncryptedVaultKey,
-            SubscriptionTierId = null
+            SubscriptionTierId = user.SubscriptionTierId
         };
 
     // Reads the authenticated user id from standard JWT claims.
