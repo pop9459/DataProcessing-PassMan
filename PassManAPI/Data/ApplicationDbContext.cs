@@ -23,13 +23,16 @@ namespace PassManAPI.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Helper to get correct timestamp SQL based on provider
+            var timestampSql = Database.IsMySql() ? "CURRENT_TIMESTAMP(6)" : "CURRENT_TIMESTAMP";
+
             // User configurations
             modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
             modelBuilder
                 .Entity<User>()
                 .Property(u => u.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql(timestampSql);
 
             // Vault configurations
             modelBuilder
@@ -42,7 +45,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Vault>()
                 .Property(v => v.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql(timestampSql);
 
             // Credential configurations
             modelBuilder
@@ -62,7 +65,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Credential>()
                 .Property(c => c.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql(timestampSql);
 
             // VaultShare configurations (composite key)
             modelBuilder.Entity<VaultShare>().HasKey(vs => new { vs.VaultId, vs.UserId });
@@ -92,7 +95,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql(timestampSql);
 
             // Attachment configurations
             modelBuilder
@@ -105,7 +108,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Attachment>()
                 .Property(a => a.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                .HasDefaultValueSql(timestampSql);
 
             // Invitation configurations
             modelBuilder
