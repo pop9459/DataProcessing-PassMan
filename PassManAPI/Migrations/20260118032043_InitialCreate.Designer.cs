@@ -12,7 +12,7 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260118030747_InitialCreate")]
+    [Migration("20260118032043_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -203,7 +203,7 @@ namespace PassManAPI.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CredentialId");
-                    
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("VaultId");
@@ -726,7 +726,7 @@ namespace PassManAPI.Migrations
                     b.Navigation("Vaults");
                 });
 
-                modelBuilder.Entity("PassManAPI.Models.Vault", b =>
+            modelBuilder.Entity("PassManAPI.Models.Vault", b =>
                 {
                     b.Navigation("AuditLogs");
 
