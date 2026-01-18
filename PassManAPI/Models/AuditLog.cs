@@ -25,6 +25,11 @@ namespace PassManAPI.Models
         CredentialDeleted = 302,
         CredentialViewed = 303,
 
+        // Tag actions
+        TagCreated = 350,
+        TagUpdated = 351,
+        TagDeleted = 352,
+
         // Security events
         FailedLoginAttempt = 400,
         SuspiciousActivity = 401,
