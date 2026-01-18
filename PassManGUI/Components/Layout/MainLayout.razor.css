@@ -1,25 +1,122 @@
+/* Main Layout */
 .page {
+    position: relative;
+    min-height: 100vh;
     width: 100%;
+    background-color: var(--bg-primary);
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
+}
+
+main {
+    padding: 0;
     min-height: 100vh;
 }
 
-#blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
-    bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
-    box-sizing: border-box;
-    display: none;
-    left: 0;
-    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+/* Hamburger Button */
+.hamburger-btn {
     position: fixed;
-    width: 100%;
-    z-index: 1000;
+    top: 20px;
+    left: 20px;
+    z-index: 50;
+    /* Above content, below sidebar */
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
+.hamburger-btn:hover {
+    background: var(--bg-input);
+    transform: scale(1.05);
+}
+
+/* Content Area */
+.content-area {
+    padding: 20px;
+    width: 100%;
+}
+
+/* Slide-out Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    z-index: 200;
+    /* Highest z-index */
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.open {
+    transform: translateX(0);
+}
+
+/* Sidebar Close Button */
+.sidebar-header {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: var(--transition);
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-input);
+}
+
+/* Backdrop */
+.nav-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+    /* Between content and sidebar */
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
     }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .content-area {
+        padding-top: 70px;
+        /* Space for hamburger button */
+    }
+}

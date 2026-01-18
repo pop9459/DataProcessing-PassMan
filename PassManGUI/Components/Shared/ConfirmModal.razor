@@ -51,15 +51,22 @@
     
     private async Task Cancel()
     {
-        IsVisible = false;
-        await IsVisibleChanged.InvokeAsync(false);
+        try
+        {
+            IsVisible = false;
+            await IsVisibleChanged.InvokeAsync(false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ConfirmModal] Error during cancel: {ex.Message}");
+        }
     }
     
     private void OnOverlayClick()
     {
         if (!IsProcessing)
         {
-            _ = Cancel();
+            InvokeAsync(Cancel);
         }
     }
     
@@ -70,11 +77,15 @@
         try
         {
             await OnConfirm.InvokeAsync();
-            await Cancel();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ConfirmModal] Error during confirm: {ex.Message}");
         }
         finally
         {
             IsProcessing = false;
+            await Cancel();
         }
     }
 }

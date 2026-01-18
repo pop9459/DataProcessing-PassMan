@@ -57,7 +57,7 @@
                         {
                             <button 
                                 type="button" 
-                                class="icon-option @(VaultIcon == icon ? "selected" : "")"
+                                class="icon-option @( (VaultIcon == icon || (icon == "🚫" && string.IsNullOrEmpty(VaultIcon))) ? "selected" : "")"
                                 @onclick="() => SelectIcon(icon)">
                                 @icon
                             </button>
@@ -100,7 +100,7 @@
     
     private readonly string[] AvailableIcons = new[] 
     { 
-        "🔐", "💼", "🏠", "💰", "🎮", "📧", "🌐", "🔑", "🛡️", "📱",
+        "🚫", "🔐", "💼", "🏠", "💰", "🎮", "📧", "🌐", "🔑", "🛡️", "📱",
         "💳", "🏦", "📁", "🔒", "⭐"
     };
     
@@ -117,7 +117,7 @@
             // Reset form for new vault
             VaultName = "";
             VaultDescription = "";
-            VaultIcon = "🔐";
+            VaultIcon = null; // Default to "No Icon" (🚫)
             ErrorMessage = "";
             hasAttemptedSubmit = false;
         }
@@ -125,7 +125,14 @@
     
     private void SelectIcon(string icon)
     {
-        VaultIcon = icon;
+        if (icon == "🚫")
+        {
+            VaultIcon = null;
+        }
+        else
+        {
+            VaultIcon = icon;
+        }
     }
     
     private async Task Close()

@@ -34,76 +34,79 @@
                         <p>Loading vaults...</p>
                     </div>
                 }
-                else if (!string.IsNullOrEmpty(errorMessage))
+                else 
                 {
-                    <div class="error-state">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
-                        </svg>
-                        <h2>Failed to load vaults</h2>
-                        <p>@errorMessage</p>
-                        <button class="btn-primary" @onclick="LoadVaults">Try Again</button>
-                    </div>
-                }
-                else if (vaults.Count == 0)
-                {
-                    <!-- Empty State -->
-                    <div class="empty-state">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                            <path d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <h2>No vaults yet</h2>
-                        <p>Create your first vault to start storing your passwords securely.</p>
-                        <button class="btn-primary" @onclick="OpenCreateModal">Create Your First Vault</button>
-                    </div>
-                }
-                else
-                {
-                    <!-- Vaults Grid -->
-                    <div class="vaults-grid">
-                        @foreach (var vault in vaults)
-                        {
-                            <div class="vault-card" @onclick="() => OpenVault(vault.Id)">
-                                <div class="vault-card-header">
-                                    @if (!string.IsNullOrEmpty(vault.Icon))
-                                    {
-                                        <span class="vault-icon">@vault.Icon</span>
-                                    }
-                                    <h3>@vault.Name</h3>
-                                    @if (vault.IsOwner)
-                                    {
-                                        <div class="vault-actions" @onclick:stopPropagation="true">
-                                            <button class="icon-btn" title="Edit vault" @onclick="() => OpenEditModal(vault)">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                                </svg>
-                                            </button>
-                                            <button class="icon-btn danger" title="Delete vault" @onclick="() => OpenDeleteModal(vault)">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    }
-                                </div>
-                                @if (!string.IsNullOrEmpty(vault.Description))
-                                {
-                                    <p class="vault-description">@vault.Description</p>
-                                }
-                                <div class="vault-card-footer">
-                                    <span class="last-modified">
-                                        Created @vault.CreatedAt.ToString("MMM dd, yyyy")
-                                        @if (vault.UpdatedAt.HasValue && vault.UpdatedAt != vault.CreatedAt)
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="error-banner">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+                            </svg>
+                            <span>@errorMessage</span>
+                            <button class="close-error" @onclick="() => errorMessage = string.Empty">✕</button>
+                        </div>
+                    }
+
+                    @if (vaults.Count == 0)
+                    {
+                        <!-- Empty State -->
+                        <div class="empty-state">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <h2>No vaults yet</h2>
+                            <p>Create your first vault to start storing your passwords securely.</p>
+                            <button class="btn-primary" @onclick="OpenCreateModal">Create Your First Vault</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Vaults Grid -->
+                        <div class="vaults-grid">
+                            @foreach (var vault in vaults)
+                            {
+                                <div class="vault-card" @onclick="() => OpenVault(vault.Id)">
+                                    <div class="vault-card-header">
+                                        @if (!string.IsNullOrEmpty(vault.Icon))
                                         {
-                                            <span> • Updated @vault.UpdatedAt.Value.ToString("MMM dd, yyyy")</span>
+                                            <span class="vault-icon">@vault.Icon</span>
                                         }
-                                    </span>
+                                        <h3>@vault.Name</h3>
+                                        @if (vault.IsOwner)
+                                        {
+                                            <div class="vault-actions" @onclick:stopPropagation="true">
+                                                <button class="icon-btn" title="Edit vault" @onclick="() => OpenEditModal(vault)">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                                <button class="icon-btn danger" title="Delete vault" @onclick="() => OpenDeleteModal(vault)">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(vault.Description))
+                                    {
+                                        <p class="vault-description">@vault.Description</p>
+                                    }
+                                    <div class="vault-card-footer">
+                                        <span class="last-modified">
+                                            Created @vault.CreatedAt.ToString("MMM dd, yyyy")
+                                            @if (vault.UpdatedAt.HasValue && vault.UpdatedAt != vault.CreatedAt)
+                                            {
+                                                <span> • Updated @vault.UpdatedAt.Value.ToString("MMM dd, yyyy")</span>
+                                            }
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
                 }
             </div>
         </div>
@@ -269,16 +272,24 @@
     
     private async Task HandleDeleteConfirm()
     {
-        if (vaultToDelete == null) return;
+        Console.WriteLine("[Vaults] Delete confirmation confirmed");
+        if (vaultToDelete == null) 
+        {
+            Console.WriteLine("[Vaults] Error: vaultToDelete is null");
+            return;
+        }
         
+        Console.WriteLine($"[Vaults] Deleting vault {vaultToDelete.Id}...");
         var result = await ApiService.DeleteVaultAsync(vaultToDelete.Id);
+        
         if (result.Success)
         {
-            vaults.RemoveAll(v => v.Id == vaultToDelete.Id);
-            StateHasChanged();
+            Console.WriteLine("[Vaults] Delete successful, reloading vaults...");
+            await LoadVaults();
         }
         else
         {
+            Console.WriteLine($"[Vaults] Delete failed: {result.ErrorMessage}");
             errorMessage = result.ErrorMessage ?? "Failed to delete vault";
         }
         

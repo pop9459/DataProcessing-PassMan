@@ -1,5 +1,7 @@
 @page "/signup"
 @rendermode InteractiveServer
+@using PassManGUI.Components.Layout
+@layout EmptyLayout
 @using PassManGUI.Services
 @inject AuthService AuthService
 @inject NavigationManager Navigation
@@ -113,13 +115,6 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label class="checkbox-label terms-checkbox">
-                    <input type="checkbox" id="terms" @bind="agreeToTerms" required disabled="@isLoading" />
-                    <span>I agree to the <a href="/terms" class="link-text-bold">Terms of Service</a> and <a href="/privacy" class="link-text-bold">Privacy Policy</a></span>
-                </label>
-            </div>
-
             <button type="submit" class="btn-primary" disabled="@isLoading">
                 @if (isLoading)
                 {
@@ -143,7 +138,6 @@
     private bool showPassword = false;
     private bool showConfirmPassword = false;
     private bool isLoading = false;
-    private bool agreeToTerms = false;
     private string username = string.Empty;
     private string email = string.Empty;
     private string password = string.Empty;
@@ -187,12 +181,6 @@
         if (password != confirmPassword)
         {
             errorMessage = "Passwords do not match.";
-            return;
-        }
-        
-        if (!agreeToTerms)
-        {
-            errorMessage = "You must agree to the Terms of Service and Privacy Policy.";
             return;
         }
         
