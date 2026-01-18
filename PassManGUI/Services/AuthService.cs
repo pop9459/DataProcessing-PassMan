@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Microsoft.JSInterop;
 using PassManGUI.Models;
 
@@ -90,6 +91,31 @@ public class AuthService
         {
             _logger.LogError(ex, "Error during login");
             return ApiResponse<UserProfile>.ErrorResponse("An error occurred during login");
+        }
+    }
+
+    /// <summary>
+    /// Authenticates user with Google ID Token
+    /// </summary>
+    public async Task<ApiResponse<AuthResponse>> LoginWithGoogleAsync(string idToken)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/auth/google", new { IdToken = idToken });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                return ApiResponse<AuthResponse>.SuccessResponse(authResponse!);
+            }
+
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            return ApiResponse<AuthResponse>.ErrorResponse(errorMessage, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Google login");
+            return ApiResponse<AuthResponse>.ErrorResponse("An error occurred during Google login");
         }
     }
 

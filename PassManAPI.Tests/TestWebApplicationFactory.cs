@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using PassManAPI.Data;
+using PassManAPI.Models;
 
 namespace PassManAPI.Tests;
 
@@ -41,6 +42,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             db.Database.EnsureCreated();
+
+            // Seed roles/permissions so authorization policies can be tested.
+            DbSeeder.SeedAsync(scope.ServiceProvider, seedDemoUsers: true).GetAwaiter().GetResult();
         });
 
         return base.CreateHost(builder);

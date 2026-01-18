@@ -1,12 +1,16 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
 using PassManAPI.Services;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.EntityFrameworkCore;
+using Google.Apis.Auth;
 
 namespace PassManAPI.Controllers;
 
@@ -15,22 +19,32 @@ namespace PassManAPI.Controllers;
 [Authorize]
 public class AuthController : ControllerBase
 {
+    private const string DefaultRole = "VaultOwner";
+    private readonly ApplicationDbContext _db;
     private readonly PassManAPI.Managers.UserManager _userManager;
     private readonly Microsoft.AspNetCore.Identity.UserManager<User> _identityUserManager;
     private readonly SignInManager<User> _signInManager;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly RoleManager<IdentityRole<int>> _roleManager;
+    private readonly ILookupNormalizer _normalizer;
 
     public AuthController(
+        ApplicationDbContext db,
         PassManAPI.Managers.UserManager userManager,
         Microsoft.AspNetCore.Identity.UserManager<User> identityUserManager,
         SignInManager<User> signInManager,
-        IJwtTokenService jwtTokenService
+        IJwtTokenService jwtTokenService,
+        RoleManager<IdentityRole<int>> roleManager,
+        ILookupNormalizer normalizer
     )
     {
+        _db = db;
         _userManager = userManager;
         _identityUserManager = identityUserManager;
         _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
+        _roleManager = roleManager;
+        _normalizer = normalizer;
     }
 
     /// <summary>
@@ -60,6 +74,19 @@ public class AuthController : ControllerBase
         if (!result.Success || result.Data is null)
         {
             return BadRequest(result.Error ?? "Registration failed.");
+        }
+
+        // Assign default role so authorization policies can be exercised.
+        var identityUser = await _identityUserManager.FindByIdAsync(result.Data.Id.ToString());
+        if (identityUser is null)
+        {
+            return BadRequest("User not found after creation.");
+        }
+
+        var roleResult = await AddUserToRoleAsync(identityUser, DefaultRole);
+        if (!roleResult.Success)
+        {
+            return BadRequest(roleResult.Error);
         }
 
         var token = _jwtTokenService.CreateAccessToken(
@@ -118,6 +145,72 @@ public class AuthController : ControllerBase
 
         var token = _jwtTokenService.CreateAccessToken(user);
         return Ok(new AuthResponse(token, ToProfile(user)));
+    }
+
+    /// <summary>
+    /// Authenticates a user via Google Id Token.
+    /// </summary>
+    [HttpPost("google")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
+    {
+        try
+        {
+            var settings = new GoogleJsonWebSignature.ValidationSettings()
+            {
+               // Audience = new List<string> { "<YOUR_CLIENT_ID>" } // For production security
+            };
+
+            var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+            
+            var normalizedEmail = _normalizer.NormalizeEmail(payload.Email) ?? payload.Email.ToUpperInvariant();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
+
+            if (user == null)
+            {
+                // Register new user
+                user = new User
+                {
+                    UserName = payload.Name ?? payload.Email.Split('@')[0],
+                    Email = payload.Email,
+                    NormalizedEmail = normalizedEmail,
+                    NormalizedUserName = (payload.Name ?? payload.Email.Split('@')[0]).ToUpperInvariant(),
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow,
+                    EmailConfirmed = true
+                };
+
+                _db.Users.Add(user);
+                await _db.SaveChangesAsync();
+
+                // Assign default role for new Google signups.
+                var identityUser = await _identityUserManager.FindByIdAsync(user.Id.ToString());
+                if (identityUser != null)
+                {
+                    await AddUserToRoleAsync(identityUser, DefaultRole);
+                }
+            }
+            else
+            {
+                user.LastLoginAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+
+            var token = _jwtTokenService.CreateAccessToken(user);
+            return Ok(new AuthResponse(token, ToProfile(user)));
+
+        }
+        catch (InvalidJwtException ex)
+        {
+             return BadRequest($"Invalid Google Token: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+             return BadRequest($"Google Login Failed: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -246,4 +339,96 @@ public class AuthController : ControllerBase
 
         return int.TryParse(claim.Value, out var userId) ? userId : null;
     }
+
+    /// <summary>
+    /// Gets all permissions for the current user based on their roles.
+    /// </summary>
+    [HttpGet("permissions")]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetPermissions()
+    {
+        var userId = GetUserId();
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var identityUser = await _identityUserManager.FindByIdAsync(userId.Value.ToString());
+        if (identityUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var roles = await _identityUserManager.GetRolesAsync(identityUser);
+        var permissions = new HashSet<string>();
+
+        foreach (var roleName in roles)
+        {
+            var role = await _roleManager.FindByNameAsync(roleName);
+            if (role != null)
+            {
+                var roleClaims = await _roleManager.GetClaimsAsync(role);
+                foreach (var claim in roleClaims.Where(c => c.Type == "permission"))
+                {
+                    permissions.Add(claim.Value);
+                }
+            }
+        }
+
+        return Ok(permissions.ToList());
+    }
+
+    /// <summary>
+    /// Assigns a role to a user (Admin only).
+    /// </summary>
+    [HttpPost("assign-role")]
+    [Authorize(Policy = "admin.manage")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignRole([FromBody] AssignRoleRequest request)
+    {
+        var identityUser = await _identityUserManager.FindByIdAsync(request.UserId.ToString());
+        if (identityUser == null)
+        {
+            return NotFound("User not found.");
+        }
+
+        var role = await _roleManager.FindByNameAsync(request.RoleName);
+        if (role == null)
+        {
+            return BadRequest($"Role '{request.RoleName}' does not exist.");
+        }
+
+        var result = await AddUserToRoleAsync(identityUser, request.RoleName);
+        if (!result.Succeeded)
+        {
+            return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
+        }
+
+        return Ok(new { Message = $"User assigned to role '{request.RoleName}' successfully." });
+    }
+
+    /// <summary>
+    /// Helper: add user to role, creating the role if missing.
+    /// </summary>
+    private async Task<IdentityResult> AddUserToRoleAsync(User user, string roleName)
+    {
+        if (!await _roleManager.RoleExistsAsync(roleName))
+        {
+            await _roleManager.CreateAsync(new IdentityRole<int>(roleName));
+        }
+        return await _identityUserManager.AddToRoleAsync(user, roleName);
+    }
 }
+
+/// <summary>
+/// Request for assigning a role to a user.
+/// </summary>
+public record AssignRoleRequest(int UserId, string RoleName);
+
+/// <summary>
+/// Request for Google OAuth login.
+/// </summary>
+public record GoogleLoginRequest(string IdToken);

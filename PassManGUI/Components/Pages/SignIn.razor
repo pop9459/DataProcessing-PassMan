@@ -40,7 +40,7 @@
         <!-- OAuth Buttons -->
         <div class="oauth-container">
             @* TODO: Wire up OAuth handlers - call HandleGoogleLogin(), HandleGitHubLogin(), HandleTwitterLogin() *@
-            <button type="button" class="oauth-btn">
+            <button type="button" class="oauth-btn" @onclick="RedirectToGoogleAuth">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <path d="M17.5 10C17.5 9.5 17.5 9 17.4 8.6H10V11.8H14.3C14.1 12.8 13.5 13.7 12.6 14.3V16.3H15.2C16.7 14.9 17.5 12.7 17.5 10Z" fill="#4285F4"/>
                     <path d="M10 18C12.4 18 14.4 17.2 15.2 16.3L12.6 14.3C11.9 14.8 10.9 15.1 10 15.1C7.7 15.1 5.8 13.7 5.1 11.8H2.4V13.9C3.5 16.1 6.5 18 10 18Z" fill="#34A853"/>
@@ -59,6 +59,15 @@
                 </svg>
             </button>
         </div>
+
+        @code {
+            private void RedirectToGoogleAuth()
+            {
+                // Navigate to the controller action
+                // Using 'true' for forceLoad to bypass Blazor router and hit the server controller
+                Navigation.NavigateTo("/login/google", forceLoad: true);
+            }
+        }
 
         <div class="divider">
             <span>OR</span>

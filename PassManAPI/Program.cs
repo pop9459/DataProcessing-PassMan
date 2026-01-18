@@ -1,9 +1,13 @@
 namespace PassManAPI;
 
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PassManAPI.Data;
@@ -11,8 +15,9 @@ using PassManAPI.Models;
 using PassManAPI.Controllers;
 using PassManAPI.Helpers;
 using PassManAPI.Managers;
+using PassManAPI.Middleware;
 using PassManAPI.Services;
-using System.Text;
+using PassManAPI.Validators;
 
 public class Program
 {
@@ -75,35 +80,53 @@ public class Program
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
-        // JWT configuration + auth setup (after Identity to keep JWT as default)
+        // JWT configuration
         var jwtSection = builder.Configuration.GetSection("Jwt");
         builder.Services.Configure<JwtOptions>(jwtSection);
         var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
 
-        builder.Services.AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
-        {
-            // Validate issuer/audience/signature for every request.
-            options.TokenValidationParameters = new TokenValidationParameters
+        // Authentication: JWT Bearer as primary, with fallback to DevHeader for backward compat
+        builder.Services
+            .AddAuthentication(options =>
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtOptions.Issuer,
-                ValidAudience = jwtOptions.Audience,
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(jwtOptions.SigningKey)
-                ),
-                ClockSkew = TimeSpan.FromMinutes(1)
-            };
-        });
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtOptions.Issuer,
+                    ValidAudience = jwtOptions.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtOptions.SigningKey)
+                    ),
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
+            })
+            .AddScheme<AuthenticationSchemeOptions, DevHeaderAuthenticationHandler>(
+                DevHeaderAuthenticationHandler.Scheme,
+                _ => { });
 
-        builder.Services.AddAuthorization();
+        // JWT Token Service for generating tokens
+        builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        builder.Services.AddAuthorization(options =>
+        {
+            foreach (var permission in PermissionConstants.All)
+            {
+                options.AddPolicy(permission, policy =>
+                {
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, DevHeaderAuthenticationHandler.Scheme);
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission);
+                });
+            }
+        });
 
         // Configure CORS for frontend
         builder.Services.AddCors(options =>
@@ -120,13 +143,43 @@ public class Program
                       .AllowCredentials();
             });
         });
-
+        
         // Use BCrypt for password hashing and expose lightweight user manager
         builder.Services.AddScoped<IPasswordHasher<User>, BCryptPasswordHasher>();
         builder.Services.AddScoped<PassManAPI.Managers.UserManager>();
-        builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        // Register VaultManager for vault business logic
+        builder.Services.AddScoped<IVaultManager, VaultManager>();
+
+        // Register Security Services
+        // Additional JWT Token Service (TokenService from Services folder)
+        builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+        builder.Services.AddScoped<ITokenService, TokenService>();
+
+        // Password Encryption Service (AES-256-GCM)
+        builder.Services.AddSingleton<IPasswordEncryptionService, PasswordEncryptionService>();
+
+        // Two-Factor Authentication Service (TOTP)
+        builder.Services.AddSingleton<ITwoFactorService, TwoFactorService>();
+
+        // Breach Check Service (Have I Been Pwned)
+        builder.Services.Configure<BreachCheckSettings>(builder.Configuration.GetSection(BreachCheckSettings.SectionName));
+        builder.Services.AddHttpClient<IBreachCheckService, BreachCheckService>();
+
+        // Register Business Managers
+        builder.Services.AddScoped<ISharingManager, SharingManager>();
+        builder.Services.AddScoped<IAuthManager, AuthManager>();
+        builder.Services.AddScoped<ICredentialManager, CredentialManager>();
+        builder.Services.AddScoped<IAuditService, AuditManager>();
+
+        // FluentValidation - auto-validate request models
+        builder.Services.AddFluentValidationAutoValidation();
+        builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 
         var app = builder.Build();
+
+        // Global exception handler middleware (must be early in pipeline)
+        app.UseGlobalExceptionHandler();
 
         using (var scope = app.Services.CreateScope())
         {
@@ -159,15 +212,22 @@ public class Program
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")
                        ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
             await SqlTest.RunAsync(conn);
+        }
 
-            // Seed the database with test data
-            using var seedScope = app.Services.CreateScope();
-            await DbSeeder.SeedAsync(seedScope.ServiceProvider);
+        // Always ensure core roles/permissions exist; seed demo users only in dev.
+        using (var seedScope = app.Services.CreateScope())
+        {
+            await DbSeeder.SeedAsync(
+                seedScope.ServiceProvider,
+                seedDemoUsers: app.Environment.IsDevelopment()
+            );
+            await DatabaseArtifacts.EnsureAsync(seedScope.ServiceProvider);
         }
 
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
         {
+            // Add JWT security scheme to Swagger JSON
             app.Use(async (context, next) =>
             {
                 if (!context.Request.Path.Equals("/swagger/v1/swagger.json"))
@@ -242,5 +302,4 @@ public class Program
             WriteIndented = true
         });
     }
-
 }

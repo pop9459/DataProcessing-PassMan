@@ -10,6 +10,7 @@ namespace PassManAPI.Models
         UserLoggedIn = 101,
         UserLoggedOut = 102,
         UserPasswordChanged = 103,
+        UserRoleChanged = 104,
 
         // Vault actions
         VaultCreated = 200,
@@ -23,6 +24,11 @@ namespace PassManAPI.Models
         CredentialUpdated = 301,
         CredentialDeleted = 302,
         CredentialViewed = 303,
+
+        // Tag actions
+        TagCreated = 350,
+        TagUpdated = 351,
+        TagDeleted = 352,
 
         // Security events
         FailedLoginAttempt = 400,
@@ -48,6 +54,10 @@ namespace PassManAPI.Models
         [Required]
         public int UserId { get; set; }
 
+        // Direct links to Vault and Credential (co-exist with EntityType/EntityId pattern)
+        public int? VaultId { get; set; }
+        public int? CredentialId { get; set; }
+
         [MaxLength(45)]
         public string? IpAddress { get; set; }
 
@@ -56,8 +66,14 @@ namespace PassManAPI.Models
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        // Navigation property
+        // Navigation properties
         [ForeignKey("UserId")]
         public virtual User User { get; set; } = null!;
+
+        [ForeignKey("VaultId")]
+        public virtual Vault? Vault { get; set; }
+
+        [ForeignKey("CredentialId")]
+        public virtual Credential? Credential { get; set; }
     }
 }

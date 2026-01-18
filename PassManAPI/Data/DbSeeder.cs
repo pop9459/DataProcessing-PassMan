@@ -1,66 +1,113 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using PassManAPI.Models;
 
 namespace PassManAPI.Data;
 
 /// <summary>
-/// Seeds the database with test data for development
+/// Seeds roles, permissions and (optionally) demo users.
 /// </summary>
 public static class DbSeeder
 {
     /// <summary>
-    /// Seeds test users and roles into the database
+    /// Ensures roles and permissions exist. Optionally seeds demo users when enabled.
     /// </summary>
-    public static async Task SeedAsync(IServiceProvider serviceProvider)
+    public static async Task SeedAsync(
+        IServiceProvider serviceProvider,
+        bool seedDemoUsers = false
+    )
     {
         var userManager = serviceProvider.GetRequiredService<UserManager<User>>();
         var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole<int>>>();
 
-        // Seed roles
-        string[] roles = { "Admin", "User" };
-        foreach (var role in roles)
+        await EnsureRolesWithPermissionsAsync(roleManager);
+
+        if (seedDemoUsers)
         {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole<int> { Name = role });
-                Console.WriteLine($"Created role: {role}");
-            }
+            await EnsureDemoUsersAsync(userManager);
         }
 
-        // Seed test users
-        var testUsers = new List<(string UserName, string Email, string Password, string Role)>
+        Console.WriteLine("Authorization seeding completed!");
+    }
+
+    private static async Task EnsureRolesWithPermissionsAsync(RoleManager<IdentityRole<int>> roleManager)
+    {
+        foreach (var roleDefinition in PermissionConstants.RolePermissions)
         {
-            ("admin", "admin@passman.test", "Admin123!", "Admin"),
-            ("testuser", "user@passman.test", "Test123!", "User"),
-            ("alice", "alice@passman.test", "Alice123!", "User"),
-            ("bob", "bob@passman.test", "Bob123!!", "User")
+            var roleName = roleDefinition.Key;
+            var permissions = roleDefinition.Value;
+
+            var role = await roleManager.FindByNameAsync(roleName);
+            if (role == null)
+            {
+                role = new IdentityRole<int> { Name = roleName };
+                await roleManager.CreateAsync(role);
+                Console.WriteLine($"Created role: {roleName}");
+            }
+
+            var existingClaims = await roleManager.GetClaimsAsync(role);
+            foreach (var permission in permissions.Distinct())
+            {
+                var hasPermission = existingClaims.Any(c =>
+                    c.Type == PermissionConstants.ClaimType && c.Value == permission);
+
+                if (!hasPermission)
+                {
+                    await roleManager.AddClaimAsync(
+                        role,
+                        new Claim(PermissionConstants.ClaimType, permission)
+                    );
+                    Console.WriteLine($"Attached permission '{permission}' to role '{roleName}'");
+                }
+            }
+        }
+    }
+
+    private static async Task EnsureDemoUsersAsync(UserManager<User> userManager)
+    {
+        var demoUsers = new List<(string UserName, string Email, string Password, string[] Roles)>
+        {
+            ("admin", "admin@passman.test", "Admin123!", new[] { "Admin" }),
+            ("auditor", "auditor@passman.test", "Audit123!", new[] { "SecurityAuditor" }),
+            ("owner", "owner@passman.test", "Owner123!", new[] { "VaultOwner" }),
+            ("reader", "reader@passman.test", "Reader123!", new[] { "VaultReader" })
         };
 
-        foreach (var (userName, email, password, role) in testUsers)
+        foreach (var (userName, email, password, roles) in demoUsers)
         {
-            if (await userManager.FindByEmailAsync(email) == null)
+            var existingUser = await userManager.FindByEmailAsync(email);
+            if (existingUser is not null)
             {
-                var user = new User
+                foreach (var role in roles)
                 {
-                    UserName = userName,
-                    Email = email,
-                    EmailConfirmed = true, // Skip email confirmation for test users
-                    CreatedAt = DateTime.UtcNow
-                };
+                    if (!await userManager.IsInRoleAsync(existingUser, role))
+                    {
+                        await userManager.AddToRoleAsync(existingUser, role);
+                        Console.WriteLine($"Linked existing user {userName} to role {role}");
+                    }
+                }
+                continue;
+            }
 
-                var result = await userManager.CreateAsync(user, password);
-                if (result.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(user, role);
-                    Console.WriteLine($"Created test user: {userName} ({role})");
-                }
-                else
-                {
-                    Console.WriteLine($"Failed to create user {userName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                }
+            var user = new User
+            {
+                UserName = userName,
+                Email = email,
+                EmailConfirmed = true, // demo users skip email confirmation
+                CreatedAt = DateTime.UtcNow,
+                SecurityStamp = Guid.NewGuid().ToString()
+            };
+
+            var result = await userManager.CreateAsync(user, password);
+            if (result.Succeeded)
+            {
+                await userManager.AddToRolesAsync(user, roles);
+                Console.WriteLine($"Created demo user: {userName} ({string.Join(", ", roles)})");
+            }
+            else
+            {
+                Console.WriteLine($"Failed to create user {userName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
             }
         }
-
-        Console.WriteLine("Database seeding completed!");
     }
 }
