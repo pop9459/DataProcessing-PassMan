@@ -26,6 +26,7 @@ namespace PassManAPI.Models
         public Guid? SubscriptionTierId { get; set; }
 
         // Navigation properties
+        public virtual SubscriptionTier? SubscriptionTier { get; set; }
         public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
         public virtual ICollection<VaultShare> SharedVaults { get; set; } = new List<VaultShare>();
         public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
