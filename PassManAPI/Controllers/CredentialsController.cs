@@ -81,7 +81,7 @@ public class CredentialsController : ControllerBase
     /// The provided credential data will be encrypted before being stored.
     /// </remarks>
     /// <param name="vaultId">The unique identifier of the vault where the credential will be stored.</param>
-    /// <param name="credential">The credential object to be created. The password within this object will be encrypted.</param>
+    /// <param name="request">The credential object to be created. The password within this object will be encrypted.</param>
     /// <response code="201">Returns the newly created credential's location.</response>
     /// <response code="400">If the provided credential data is invalid.</response>
     /// <response code="401">If the user is not authenticated.</response>
@@ -211,7 +211,7 @@ public class CredentialsController : ControllerBase
     /// Any sensitive information will be re-encrypted upon update.
     /// </remarks>
     /// <param name="id">The unique identifier of the credential to update.</param>
-    /// <param name="credential">The updated credential object.</param>
+    /// <param name="update">The updated credential object.</param>
     /// <response code="204">If the credential was updated successfully.</response>
     /// <response code="400">If the provided credential data is invalid.</response>
     /// <response code="401">If the user is not authenticated.</response>
