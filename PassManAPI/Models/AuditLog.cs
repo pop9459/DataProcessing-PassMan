@@ -62,8 +62,19 @@ namespace PassManAPI.Models
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        // Navigation property
+        // Optional direct foreign keys for Vault and Credential
+        // These provide direct relationships in addition to the generic EntityType/EntityId pattern
+        public int? VaultId { get; set; }
+        public int? CredentialId { get; set; }
+
+        // Navigation properties
         [ForeignKey("UserId")]
         public virtual User User { get; set; } = null!;
+
+        [ForeignKey("VaultId")]
+        public virtual Vault? Vault { get; set; }
+
+        [ForeignKey("CredentialId")]
+        public virtual Credential? Credential { get; set; }
     }
 }
