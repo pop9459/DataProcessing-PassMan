@@ -39,5 +39,8 @@ namespace PassManAPI.Models
 
         public virtual ICollection<Credential> Credentials { get; set; } = new List<Credential>();
         public virtual ICollection<VaultShare> SharedUsers { get; set; } = new List<VaultShare>();
+
+        // TODO: Add Invitations navigation property when Invitation model is implemented
+        // public virtual ICollection<Invitation> Invitations { get; set; } = new List<Invitation>();
     }
 }
