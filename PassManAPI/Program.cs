@@ -140,6 +140,7 @@ public class Program
         // Register Business Managers
         builder.Services.AddScoped<ISharingManager, SharingManager>();
         builder.Services.AddScoped<IAuthManager, AuthManager>();
+        builder.Services.AddScoped<ICredentialManager, CredentialManager>();
         builder.Services.AddScoped<IAuditService, AuditManager>();
 
         // FluentValidation - auto-validate request models
