@@ -57,23 +57,28 @@ public class UpdateProfileRequest
     public string? EncryptedVaultKey { get; set; }
 }
 
-public record UserProfileResponse(
-    int Id,
-    string Email,
-    string? UserName,
-    string? PhoneNumber,
-    DateTime CreatedAt,
-    DateTime? UpdatedAt,
-    DateTime? LastLoginAt,
-    string? EncryptedVaultKey,
-    Guid? SubscriptionTierId
-);
+/// <summary>
+/// User profile response DTO.
+/// </summary>
+public class UserProfileResponse
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string? UserName { get; set; }
+    public string? PhoneNumber { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? LastLoginAt { get; set; }
+    public string? EncryptedVaultKey { get; set; }
+    public Guid? SubscriptionTierId { get; set; }
+}
 
 /// <summary>
 /// Authentication response payload; accessToken is a placeholder until JWT is added.
 /// </summary>
-public record AuthResponse(
-    string AccessToken,
-    UserProfileResponse User
-);
+public class AuthResponse
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public UserProfileResponse User { get; set; } = new();
+}
 

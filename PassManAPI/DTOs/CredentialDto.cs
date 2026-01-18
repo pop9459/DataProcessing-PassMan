@@ -6,20 +6,21 @@ namespace PassManAPI.DTOs;
 /// Response DTO for Credential information.
 /// Note: Does not include the encrypted password for security reasons.
 /// </summary>
-public record CredentialDto(
-    int Id,
-    string Title,
-    string? Username,
-    string? Url,
-    string? Notes,
-    int? CategoryId,
-    string? CategoryName,
-    int VaultId,
-    DateTime CreatedAt,
-    DateTime? UpdatedAt,
-    DateTime? LastAccessed,
-    List<TagDto> Tags
-);
+public record CredentialDto
+{
+    public int Id { get; init; }
+    public string Title { get; init; } = string.Empty;
+    public string? Username { get; init; }
+    public string? Url { get; init; }
+    public string? Notes { get; init; }
+    public int? CategoryId { get; init; }
+    public string? CategoryName { get; init; }
+    public int VaultId { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? UpdatedAt { get; init; }
+    public DateTime? LastAccessed { get; init; }
+    public List<TagDto> Tags { get; init; } = new();
+}
 
 /// <summary>
 /// Request DTO for creating a new credential.
@@ -78,7 +79,8 @@ public class UpdateCredentialPasswordRequest
 /// <summary>
 /// Response DTO for decrypted password.
 /// </summary>
-public record DecryptedPasswordDto(
-    int CredentialId,
-    string DecryptedPassword
-);
+public record DecryptedPasswordDto
+{
+    public int CredentialId { get; init; }
+    public string DecryptedPassword { get; init; } = string.Empty;
+}

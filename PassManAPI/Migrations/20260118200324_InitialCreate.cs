@@ -309,6 +309,33 @@ namespace PassManAPI.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "Invitations",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    VaultId = table.Column<int>(type: "int", nullable: false),
+                    InvitedEmail = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    InviteToken = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Role = table.Column<int>(type: "int", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    AcceptedAt = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Invitations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Invitations_Vaults_VaultId",
+                        column: x => x.VaultId,
+                        principalTable: "Vaults",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "VaultShares",
                 columns: table => new
                 {
@@ -336,6 +363,32 @@ namespace PassManAPI.Migrations
                         name: "FK_VaultShares_Vaults_VaultId",
                         column: x => x.VaultId,
                         principalTable: "Vaults",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Attachments",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    CredentialId = table.Column<int>(type: "int", nullable: false),
+                    FilePath = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    EncryptedSymmetricKey = table.Column<byte[]>(type: "longblob", nullable: false),
+                    OriginalFileName = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP(6)")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Attachments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Attachments_Credentials_CredentialId",
+                        column: x => x.CredentialId,
+                        principalTable: "Credentials",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -470,6 +523,11 @@ namespace PassManAPI.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Attachments_CredentialId",
+                table: "Attachments",
+                column: "CredentialId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AuditLogs_CredentialId",
                 table: "AuditLogs",
                 column: "CredentialId");
@@ -498,6 +556,17 @@ namespace PassManAPI.Migrations
                 name: "IX_CredentialTags_TagId",
                 table: "CredentialTags",
                 column: "TagId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Invitations_InviteToken",
+                table: "Invitations",
+                column: "InviteToken",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Invitations_VaultId_InvitedEmail",
+                table: "Invitations",
+                columns: new[] { "VaultId", "InvitedEmail" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tags_Name",
@@ -545,10 +614,16 @@ namespace PassManAPI.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "Attachments");
+
+            migrationBuilder.DropTable(
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
                 name: "CredentialTags");
+
+            migrationBuilder.DropTable(
+                name: "Invitations");
 
             migrationBuilder.DropTable(
                 name: "VaultShares");
