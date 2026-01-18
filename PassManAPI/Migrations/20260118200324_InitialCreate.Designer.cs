@@ -12,11 +12,7 @@ using PassManAPI.Data;
 namespace PassManAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
-    [Migration("20260118195346_InitialCreate")]
-========
-    [Migration("20260118032043_InitialCreate")]
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
+    [Migration("20260118200324_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -378,9 +374,6 @@ namespace PassManAPI.Migrations
                     b.ToTable("Credentials");
                 });
 
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
-            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
-========
             modelBuilder.Entity("PassManAPI.Models.CredentialTag", b =>
                 {
                     b.Property<int>("CredentialId")
@@ -398,8 +391,7 @@ namespace PassManAPI.Migrations
                     b.ToTable("CredentialTags");
                 });
 
-            modelBuilder.Entity("PassManAPI.Models.Tag", b =>
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -407,7 +399,6 @@ namespace PassManAPI.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
                     b.Property<DateTime?>("AcceptedAt")
                         .HasColumnType("datetime(6)");
 
@@ -415,14 +406,10 @@ namespace PassManAPI.Migrations
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("InviteToken")
-========
-                    b.Property<string>("Name")
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
 
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
                     b.Property<string>("InvitedEmail")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -432,28 +419,42 @@ namespace PassManAPI.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("VaultId")
-========
-                    b.Property<int>("UserId")
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
                     b.HasIndex("InviteToken")
                         .IsUnique();
 
                     b.HasIndex("VaultId", "InvitedEmail");
 
                     b.ToTable("Invitations");
-========
+                });
+
+            modelBuilder.Entity("PassManAPI.Models.Tag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
                     b.HasIndex("Name")
                         .IsUnique();
 
                     b.HasIndex("UserId");
 
                     b.ToTable("Tags");
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
                 });
 
             modelBuilder.Entity("PassManAPI.Models.User", b =>
@@ -721,17 +722,6 @@ namespace PassManAPI.Migrations
                     b.Navigation("Vault");
                 });
 
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
-            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
-                {
-                    b.HasOne("PassManAPI.Models.Vault", "Vault")
-                        .WithMany("Invitations")
-                        .HasForeignKey("VaultId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Vault");
-========
             modelBuilder.Entity("PassManAPI.Models.CredentialTag", b =>
                 {
                     b.HasOne("PassManAPI.Models.Credential", "Credential")
@@ -751,16 +741,26 @@ namespace PassManAPI.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
+                {
+                    b.HasOne("PassManAPI.Models.Vault", "Vault")
+                        .WithMany("Invitations")
+                        .HasForeignKey("VaultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vault");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
                 {
                     b.HasOne("PassManAPI.Models.User", "User")
-                        .WithMany()
+                        .WithMany("Tags")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Vault", b =>
@@ -806,9 +806,8 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
                 {
-<<<<<<<< HEAD:PassManAPI/Migrations/20260118195346_InitialCreate.Designer.cs
                     b.Navigation("Attachments");
-========
+
                     b.Navigation("AuditLogs");
 
                     b.Navigation("CredentialTags");
@@ -817,7 +816,6 @@ namespace PassManAPI.Migrations
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
                 {
                     b.Navigation("CredentialTags");
->>>>>>>> origin/develop:PassManAPI/Migrations/20260118032043_InitialCreate.Designer.cs
                 });
 
             modelBuilder.Entity("PassManAPI.Models.User", b =>
@@ -825,6 +823,8 @@ namespace PassManAPI.Migrations
                     b.Navigation("AuditLogs");
 
                     b.Navigation("SharedVaults");
+
+                    b.Navigation("Tags");
 
                     b.Navigation("Vaults");
                 });
