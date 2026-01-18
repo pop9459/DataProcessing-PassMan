@@ -91,8 +91,7 @@ public static class PermissionConstants
                     TagRead,
                     TagCreate,
                     TagUpdate,
-                    TagDelete,
-                    AuditRead
+                    TagDelete
                 }
             },
             {

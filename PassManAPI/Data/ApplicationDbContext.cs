@@ -23,13 +23,17 @@ namespace PassManAPI.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Check if running against SQLite (for tests)
+            var isSqlite = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite";
+            var timestampSql = isSqlite ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)";
+
             // User configurations
             modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
 
             modelBuilder
                 .Entity<User>()
                 .Property(u => u.CreatedAt)
-                .HasDefaultValueSql(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql(timestampSql);
 
             // Vault configurations
             modelBuilder
@@ -42,7 +46,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Vault>()
                 .Property(v => v.CreatedAt)
-                .HasDefaultValueSql(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql(timestampSql);
 
             // Global query filter for soft delete - automatically excludes deleted vaults
             modelBuilder
@@ -67,7 +71,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<Credential>()
                 .Property(c => c.CreatedAt)
-                .HasDefaultValueSql(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql(timestampSql);
 
             // VaultShare configurations (composite key)
             modelBuilder.Entity<VaultShare>().HasKey(vs => new { vs.VaultId, vs.UserId });
@@ -111,7 +115,7 @@ namespace PassManAPI.Data
             modelBuilder
                 .Entity<AuditLog>()
                 .Property(al => al.Timestamp)
-                .HasDefaultValueSql(Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite" ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)");
+                .HasDefaultValueSql(timestampSql);
 
             // Tag configurations
             modelBuilder

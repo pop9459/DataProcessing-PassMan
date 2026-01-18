@@ -91,7 +91,11 @@ public class Program
             foreach (var permission in PermissionConstants.All)
             {
                 options.AddPolicy(permission, policy =>
-                    policy.RequireClaim(PermissionConstants.ClaimType, permission));
+                {
+                    policy.AddAuthenticationSchemes(DevHeaderAuthenticationHandler.Scheme);
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireClaim(PermissionConstants.ClaimType, permission);
+                });
             }
         });
 
@@ -137,6 +141,7 @@ public class Program
         builder.Services.AddScoped<ISharingManager, SharingManager>();
         builder.Services.AddScoped<IAuthManager, AuthManager>();
         builder.Services.AddScoped<ICredentialManager, CredentialManager>();
+        builder.Services.AddScoped<IAuditService, AuditManager>();
 
         // FluentValidation - auto-validate request models
         builder.Services.AddFluentValidationAutoValidation();
