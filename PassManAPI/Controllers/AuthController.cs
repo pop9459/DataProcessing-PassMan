@@ -369,7 +369,8 @@ public class AuthController : ControllerBase
             user.CreatedAt,
             user.UpdatedAt,
             user.LastLoginAt,
-            user.EncryptedVaultKey
+            user.EncryptedVaultKey,
+            user.SubscriptionTierId
         );
 
     private static UserProfileResponse ToProfile(Managers.UserResponse user) =>
@@ -381,7 +382,8 @@ public class AuthController : ControllerBase
             user.CreatedAt,
             user.UpdatedAt,
             user.LastLoginAt,
-            user.EncryptedVaultKey
+            user.EncryptedVaultKey,
+            user.SubscriptionTierId
         );
 
     private async Task<(bool Success, string? Error)> AddUserToRoleAsync(User user, string roleName)
