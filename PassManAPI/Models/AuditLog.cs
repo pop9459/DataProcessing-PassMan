@@ -54,6 +54,10 @@ namespace PassManAPI.Models
         [Required]
         public int UserId { get; set; }
 
+        // Direct links to Vault and Credential (co-exist with EntityType/EntityId pattern)
+        public int? VaultId { get; set; }
+        public int? CredentialId { get; set; }
+
         [MaxLength(45)]
         public string? IpAddress { get; set; }
 
@@ -61,11 +65,6 @@ namespace PassManAPI.Models
         public string? UserAgent { get; set; }
 
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-
-        // Optional direct foreign keys for Vault and Credential
-        // These provide direct relationships in addition to the generic EntityType/EntityId pattern
-        public int? VaultId { get; set; }
-        public int? CredentialId { get; set; }
 
         // Navigation properties
         [ForeignKey("UserId")]

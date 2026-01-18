@@ -202,8 +202,68 @@ This will display the Swagger UI, which provides detailed information about the 
 
 ## Testing
 
-- Integration tests live in `PassManAPI.Tests` and run the API with a test `WebApplicationFactory` using in-memory SQLite (no MySQL needed).
-- Just run from the root directory:
-    ```
-    dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
-    ``` 
+Integration tests live in `PassManAPI.Tests` and run the API with a test `WebApplicationFactory` using in-memory SQLite (no MySQL needed).
+
+### Running Tests in Docker (Recommended)
+
+To avoid file permission conflicts between Docker and local builds, run tests inside a Docker container:
+
+```bash
+docker-compose run --rm test
+```
+
+**What this does:**
+- Runs tests in an isolated container environment
+- Automatically cleans up the container after tests complete (`--rm`)
+- Prevents `obj/bin` permission issues when switching between Docker and local development
+- Uses the same test configuration as CI/CD pipelines
+
+**Additional options:**
+
+```bash
+# Run tests with watch mode (auto-rerun on file changes)
+docker-compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
+
+# Run specific test class
+docker-compose run --rm test dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
+
+# Use the helper script
+./scripts/test.fish docker        # Run tests in Docker
+./scripts/test.fish watch         # Run with watch mode
+./scripts/test.fish local         # Run locally (auto-cleans first)
+./scripts/test.fish clean         # Clean all build artifacts
+```
+
+### Running Tests Locally
+
+If you need to run tests locally (outside Docker):
+
+```bash
+# Clean build artifacts first to avoid permission issues
+rm -rf PassManAPI/obj PassManAPI/bin PassManAPI.Tests/obj PassManAPI.Tests/bin
+
+# Run tests
+dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
+```
+
+### Why Docker for Tests?
+
+When you run `docker compose up` to start the API, Docker creates `obj/` and `bin/` directories owned by the container user. Later running `dotnet test` locally fails with permission errors because your local user can't write to those directories.
+
+**The solution:** Run tests in Docker using volume exclusions (configured in `docker-compose.yml`) to keep Docker and local build artifacts separate:
+
+```yaml
+test:
+  volumes:
+    - .:/workspace
+    # Exclude build artifacts to prevent permission issues
+    - /workspace/PassManAPI/obj
+    - /workspace/PassManAPI/bin
+    - /workspace/PassManAPI.Tests/obj
+    - /workspace/PassManAPI.Tests/bin
+```
+
+This way:
+- ✅ Docker tests use containerized build artifacts
+- ✅ Local tests use local build artifacts  
+- ✅ No permission conflicts between the two 

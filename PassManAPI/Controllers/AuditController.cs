@@ -21,7 +21,6 @@ public class AuditController : ControllerBase
     {
         _auditService = auditService;
     }
-
     /// <summary>
     /// Gets the current user's audit logs with optional filtering and pagination.
     /// </summary>

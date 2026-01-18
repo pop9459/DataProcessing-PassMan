@@ -12,6 +12,9 @@ services:
       - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=root;Password=hihi;Pooling=true
     volumes:
       - ./PassManAPI:/app
+      # Exclude build artifacts to prevent permission issues
+      - /app/obj
+      - /app/bin
     depends_on:
       db:
         condition: service_healthy
@@ -31,8 +34,31 @@ services:
       - Authentication__Google__ClientSecret=${GOOGLE_CLIENT_SECRET}
     volumes:
       - ./PassManGUI:/app
+      # Exclude build artifacts to prevent permission issues
+      - /app/obj
+      - /app/bin
     depends_on:
       - passman-api
+
+  # Test service - run tests in Docker environment
+  test:
+    build:
+      context: .
+      dockerfile: PassManAPI/dockerfile.dev
+    working_dir: /workspace
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Test
+    volumes:
+      - .:/workspace
+      # Exclude build artifacts to prevent permission issues
+      - /workspace/PassManAPI/obj
+      - /workspace/PassManAPI/bin
+      - /workspace/PassManAPI.Tests/obj
+      - /workspace/PassManAPI.Tests/bin
+    entrypoint: ["dotnet"]
+    command: test PassManAPI.Tests/PassManAPI.Tests.csproj --logger "console;verbosity=detailed"
+    profiles:
+      - test
 
   db:
    image: mysql:8.0
