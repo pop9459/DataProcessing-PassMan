@@ -10,17 +10,18 @@ The document should contain:
 
 ## Project Description
 
-A secure password management system built as a RESTful API in C\#. Users can register, create encrypted vaults to store credentials, organize passwords with categories and tags, and securely share vaults with other users. The system includes role-based access control, audit logging, and subscription tiers to manage feature access.
+A secure password management system built as a RESTful API in C#. Users can register, create encrypted vaults to store credentials, organize passwords with categories and tags, and securely share vaults with other users. The system includes role-based access control, audit logging, and subscription tiers to manage feature access.
 
 ## Technologies
 
-- **Backend Framework**: ASP.NET Core Web API
-- **Programming Language**: C\# (.NET 8 or later)
-- **Database**: PostgreSQL
-- **ORM**: Entity Framework Core with Npgsql provider
-- **Authentication**: OAuth 2.0 / JWT tokens
+- **Backend Framework**: ASP.NET Core 10 Web API
+- **Programming Language**: C# (.NET 10)
+- **Database**: MySQL 8.0
+- **ORM**: Entity Framework Core with Pomelo.EntityFrameworkCore.MySql provider
+- **Authentication**: JWT Bearer + Google OAuth 2.0
 - **API Documentation**: Swagger/OpenAPI (Swashbuckle)
-- **Security**: Encryption for stored credentials, password hashing (bcrypt/Argon2)
+- **Security**: AES encryption for stored credentials, password hashing (ASP.NET Core Identity)
+- **Testing**: xUnit with FluentAssertions (106 passing tests)
 
 ***
 
@@ -82,14 +83,12 @@ From the image (additional complexity):
 
 ### Will Not Have (Out of Scope)
 
-- **Subscription/Payment System**: No Free/Premium/Enterprise tiers or billing (all users get full access)
-- **Employee/Admin Portal**: No internal staff roles for database access or customer support
-- **External Identity Provider Integration**: No LDAP, Auth0, or SSO integrations
-- **Browser Extensions**: API-only, no client applications
-- **Mobile Apps**: API-only, no native mobile development
-- **2FA/MFA**: Basic password authentication only (no two-factor authentication)
+- **External Identity Provider Integration**: No LDAP, Auth0, or SSO integrations beyond Google OAuth
+- **Browser Extensions**: API-only, Blazor frontend only
+- **Mobile Apps**: No native mobile development (API supports future mobile apps)
+- **2FA/MFA**: Basic password authentication + Google OAuth only (no TOTP/SMS 2FA)
 - **Cross-service Password Updates**: No automatic password changes across external services
-- **Technical API User with Views/Procedures**: Direct EF Core queries instead of stored procedures
+- **Enterprise Admin Panel**: No internal staff roles for database access or customer support
 
 ***
 
@@ -97,18 +96,30 @@ From the image (additional complexity):
 
 **Core Tables:**
 
-- `Users` - User accounts and authentication
+- `AspNetUsers` - User accounts with ASP.NET Core Identity
 - `Vaults` - Vault metadata and ownership
-- `Credentials` - Stored passwords and login info
-- `Categories` - Credential categorization
+- `Credentials` - Stored passwords and login info (encrypted)
+- `Tags` - Tag-based organization
+- `CredentialTags` - Many-to-many relationship
 - `VaultShares` - Sharing permissions between users
 - `AuditLogs` - Security and access tracking
+- `SubscriptionTiers` - Free/Premium tier definitions
 
-**Optional Tables (Nice to Have):**
+**Implemented Tables:**
 
-- `Attachments` - Secure file storage
-- `CredentialVersions` - Version history
-- `Devices` - Approved device tracking
+- `Attachments` - Secure file storage with credentials
+- `Invitations` - Vault sharing via email invitations
+- `AspNetRoles` - Role definitions (Admin, VaultOwner, etc.)
+- `AspNetUserRoles` - User-role assignments
+- `AspNetRoleClaims` - Permission claims for roles
+
+**Database Features:**
+
+- View: `vwUserVaultAccess` for optimized vault access queries
+- Stored Procedures: `sp_AddVaultShare`, `sp_LogAudit`
+- Triggers: `trg_Credentials_SetUpdatedAt` for automatic timestamps
+- Constraints: PK/FK, unique indexes, cascading deletes
+- Isolation: `READ COMMITTED` for high-concurrency operations
 
 ***
 

@@ -19,9 +19,9 @@ This document summarizes the API integration work completed for connecting the P
   - Credentials: CRUD operations for vault items
   - Error handling and logging throughout
 - `AuthService.cs` - Authentication and token management
-  - Token storage using sessionStorage (secure, expires on tab close)
-  - Dev token parsing (`dev-token-{userId}` format)
-  - Authorization header setup (Bearer token + X-UserId)
+  - JWT token storage using sessionStorage (secure, expires on tab close)
+  - Real JWT parsing with System.IdentityModel.Tokens.Jwt
+  - Authorization header setup (Bearer token)
   - Session restoration on app startup
   - TODO: PIN feature for localStorage persistence
 
@@ -139,31 +139,32 @@ This document summarizes the API integration work completed for connecting the P
    - User enters credentials on SignIn.razor
    - AuthService.LoginAsync calls ApiService.LoginAsync
    - ApiService calls POST /api/auth/login
-   - Backend returns dev token: `dev-token-{userId}`
+   - Backend returns JWT access token
    - AuthService stores token in sessionStorage
-   - AuthService parses userId from token
-   - Sets Authorization header: `Bearer dev-token-{userId}`
-   - Sets X-UserId header: `{userId}` (for backend dev auth)
+   - JWT contains user claims (sub=userId, email, name)
+   - Sets Authorization header: `Bearer {jwt-token}`
    - Redirects to /vaults
 
 2. **Session Restoration**:
    - On app startup, Routes.razor calls AuthService.InitializeAsync
    - AuthService checks sessionStorage for token
-   - If found, restores Authorization and X-UserId headers
+   - If found, restores Authorization header
    - User stays logged in across page refreshes (within same tab)
 
 3. **API Calls**:
    - Pages inject IApiService
    - Call ApiService methods (GetVaultsAsync, etc.)
    - ApiService uses HttpClient with auth headers already set
+   - Backend validates JWT and extracts userId from claims
    - Returns ApiResponse<T> with Success/Data/ErrorMessage
 
 ## Security Implementation
 
 - **Token Storage**: sessionStorage (session-scoped, cleared on tab close)
-- **Dev Token Format**: `dev-token-{userId}` (placeholder for real JWT)
+- **JWT Format**: Standard JWT with HS256 signing
+- **Token Claims**: UserId (sub, ClaimTypes.NameIdentifier), Email, Username
 - **Authorization Header**: Standard Bearer token format
-- **X-UserId Header**: Backend compatibility header (dev-only)
+- **Token Generation**: `JwtTokenService` with configurable expiration
 - **Future Enhancement**: PIN-protected localStorage (see TODO in AuthService)
 
 ## Testing Checklist
@@ -181,10 +182,10 @@ This document summarizes the API integration work completed for connecting the P
 
 ## Next Steps (Future Work)
 
-1. **JWT Implementation**:
-   - Replace dev tokens with real JWT
-   - Update AuthService.ExtractUserIdFromToken to parse JWT claims
-   - Remove X-UserId header (use JWT claims instead)
+1. **Enhanced Token Management**:
+   - Implement token refresh mechanism
+   - Add token expiration warnings
+   - Automatic re-authentication on token expiry
 
 2. **PIN Feature**:
    - Add PIN setup dialog after login (if "Remember me" checked)

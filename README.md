@@ -1,269 +1,315 @@
 # Password Manager API
 
-A secure password management system built as a RESTful API in C#.
+A secure password management system built as a RESTful API with ASP.NET Core and Blazor frontend.
 
-This repository contains the source code for the Password Manager API, a project focused on providing a secure and reliable way to manage credentials.
+This repository contains the source code for the Password Manager API, a project focused on providing a secure and reliable way to manage credentials with role-based access control, vault sharing, and subscription tiers.
 
-## Running the app
+## 🚀 Quick Start
 
-### Setting up Environment Variables (Required for Development)
+### Prerequisites
+- Docker & Docker Compose (recommended)
+- OR .NET SDK 10.0+ for local development
 
-The application uses Google OAuth for authentication. Before running the app, you need to configure your Google credentials:
+###Setting up Environment Variables (Required)
+
+The application uses Google OAuth for authentication. Before running the app, configure your Google credentials:
 
 1. Create a `.env` file in the repository root:
-    ```bash
-    cp .env.example .env
-    ```
+   ```bash
+   cp .env.example .env
+   ```
 
 2. Edit the `.env` file and add your Google OAuth credentials:
-    ```
-    GOOGLE_CLIENT_ID=your-google-client-id
-    GOOGLE_CLIENT_SECRET=your-google-client-secret
-    ```
+   ```
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   ```
 
-**Note:** The `.env` file is gitignored and never committed to Git. Each team member needs to set up their own `.env` file.
+**Note:** The `.env` file is gitignored and never committed. Each team member needs their own `.env` file.
 
-### Docker compose (Recommended)
-1. Clone the repository
-    ```
-    git clone https://github.com/pop9459/DataProcessing-PassMan
-    ```
-2. cd into the repository
-    ```
-    cd DataProcessing-PassMan
-    ```
-3. Set up environment variables (see above)
-4. Run 
-    ```
-    docker compose up -d
-    ```
-5. Open http://localhost:5247/ (GUI) or http://localhost:5246/ (API)
+### Docker Compose (Recommended)
 
-### Local (dotnet CLI)
-1. Install .NET SDK (9.0 or later).
-2. Clone the repository
-    ```
-    git clone https://github.com/pop9459/DataProcessing-PassMan
-    ```
-3. cd into the repository
-    ```
-    cd DataProcessing-PassMan
-    ```
-4. Set up environment variables (see "Setting up Environment Variables" section above)
-5. Install dotnet user secrets globally if not already installed:
-    ```
-    dotnet tool install -g dotnet-user-secrets
-    ```
-6. Set your local user secrets:
-    ```
-    cd PassManGUI
-    dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
-    dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
-    cd ..
-    ```
-7. Run the projects
-    ```
-    dotnet run --project PassManAPI
-    ``` 
-8. In another terminal, run:
-    ```
-    dotnet run --project PassManGUI
-    ```
-9. Open http://localhost:5247/ (GUI)
+```bash
+# Clone and navigate
+git clone https://github.com/pop9459/DataProcessing-PassMan
+cd DataProcessing-PassMan
+
+# Set up environment variables (see above)
+
+# Start all services
+docker compose up -d
+```
+
+- **GUI**: http://localhost:5247/
+- **API**: http://localhost:5246/
+- **Swagger**: http://localhost:5246/swagger
+
+### Local Development (dotnet CLI)
+
+```bash
+# Install .NET SDK (10.0 or later)
+
+# Clone and navigate
+git clone https://github.com/pop9459/DataProcessing-PassMan
+cd DataProcessing-PassMan
+
+# Set up environment variables (see "Setting up Environment Variables" above)
+
+# Set user secrets for GUI
+cd PassManGUI
+dotnet user-secrets set "Authentication:Google:ClientId" "your-google-client-id"
+dotnet user-secrets set "Authentication:Google:ClientSecret" "your-google-client-secret"
+cd ..
+
+# Run API
+dotnet run --project PassManAPI
+
+# In another terminal, run GUI
+dotnet run --project PassManGUI
+```
 
 ### Troubleshooting
 
-If you encounter build errors, try running the following commands from the root of the repository.
+If you encounter build errors:
 
-First, restore dependencies and clean the project:
-```
+```bash
 dotnet restore
-```
-```
 dotnet clean
 ```
 
-If issues persist, manually delete the `bin` and `obj` directories.
+Or manually delete `bin` and `obj` directories:
 
-**On Linux / macOS:**
+**Linux/macOS:**
 ```bash
 rm -rf bin obj
 ```
 
-**On Windows (Command Prompt):**
-```batch
-rmdir /s /q bin obj
-```
-
-**On Windows (PowerShell):**
+**Windows (PowerShell):**
 ```powershell
 Remove-Item -Recurse -Force bin, obj
 ```
 
-## Accessing the database manually
+## 🗄️ Database Access
+
+### Using MySQL Workbench
 
 1. Install [MySQL Workbench](https://dev.mysql.com/downloads/workbench/)
+2. Open database menu: <kbd>Ctrl</kbd>+<kbd>J</kbd>
+3. Enter connection details:
+   - Host: `localhost`
+   - Port: `3306`
+   - User: `root`
+   - Password: `hihi`
 
-2. Open the database menu
+## 🔐 Authentication & Authorization
 
-<kbd>Ctrl</kbd>+<kbd>J</kbd>
+### JWT Authentication
+- **Token-based**: JWT Bearer tokens for API authentication
+- **Google OAuth**: Social login integration
+- **Session Management**: Secure token storage and validation
 
-3. Enter the details
+### Role-Based Permissions
+The API seeds role-based permissions into MySQL on startup (see [`PassManAPI/Data/DbSeeder.cs`](PassManAPI/Data/DbSeeder.cs)):
 
--Host: localhost
--Port: 3306
--User: root
--Password: hihi         (intentional leak hihihiha)
+- **Admin**: Full system access (all permissions)
+- **SecurityAuditor**: `audit.read`, `vault.read`, `credential.read`, `system.health`
+- **VaultOwner**: Manage own vaults/credentials (`vault.*`, `credential.*`)
+- **VaultReader**: Read-only access (`vault.read`, `credential.read`)
 
-## Authorization roles & permissions (API)
+Permissions are stored as Identity role claims with claim type `permission`. Update [`PassManAPI/Models/Permissions.cs`](PassManAPI/Models/Permissions.cs) to add new permissions.
 
-The API seeds role-based permissions into MySQL on startup (see `PassManAPI/Data/DbSeeder.cs`). Permissions are stored as Identity role claims with claim type `permission` and follow least-privilege defaults:
+### Subscription Tiers
+- **Free Tier**: 3 vaults, 50 credentials per vault, 5MB attachments, no sharing
+- **Premium Tier**: 50 vaults, 1000 credentials per vault, 100MB attachments, vault sharing enabled
+- Default tier assigned on user registration
 
-- Admin: full access (all permissions).
-- SecurityAuditor: `audit.read`, `vault.read`, `credential.read`, `system.health`.
-- VaultOwner: manage own vaults/credentials (`vault.read/create/update/delete/share`, `credential.read/create/update/delete`).
-- VaultReader: read-only for vault metadata and credentials (`vault.read`, `credential.read`).
+## 🏗️ Architecture
 
-In development, demo users are created automatically with the roles above; in other environments only the roles/claims are ensured. Update `PassManAPI/Models/Permissions.cs` to add new permissions, and the seeder will attach them to roles on next startup.
+### Technology Stack
+- **Backend**: ASP.NET Core 10 Web API
+- **Frontend**: Blazor Server
+- **Database**: MySQL with Entity Framework Core
+- **Authentication**: JWT Bearer + Google OAuth
+- **Testing**: xUnit with FluentAssertions
+- **API Docs**: Swagger/OpenAPI
 
-## Database artifacts & isolation (value and justification)
+### Database Features
+- **Constraints**: PK/FK, unique indexes, cascading deletes
+- **View**: `vwUserVaultAccess` for vault access queries
+- **Stored Procedures**:
+  - `sp_AddVaultShare`: Validated vault sharing
+  - `sp_LogAudit`: Centralized audit logging
+- **Triggers**: `trg_Credentials_SetUpdatedAt` for automatic timestamp updates
+- **Isolation**: `READ COMMITTED` for high-concurrency operations
 
-- Constraints: PK/FK/unique and length/null constraints are defined in the EF model/migrations (e.g., unique Users.Email, composite key on VaultShares, cascading deletes where appropriate) to maintain referential integrity.
-- View: `vwUserVaultAccess` lists vaults a user can access (owner or shared) to support least-privilege querying without exposing sensitive fields.
-- Stored procedures:
-  - `sp_AddVaultShare`: validated, idempotent share creation by email (guards missing vault/user and ignores duplicates).
-  - `sp_LogAudit`: centralized insert into AuditLogs for privileged actions.
-- Trigger: `trg_Credentials_SetUpdatedAt` maintains UpdatedAt on credential updates for auditability.
-- Isolation: when running on MySQL, we set session isolation to `READ COMMITTED` during artifact setup to reduce phantom-read risk for high-churn operations while avoiding excessive locking; SQLite/test bypasses these artifacts.
-
-## Project Structure
-
-The project follows the standard ASP.NET Core Web API structure:
+### Project Structure
 
 ```
 PassManAPI/
-├── Components/             # Blazor components for UI
-│   ├── Layout/             # Layout components (MainLayout, NavMenu)
-│   └── Pages/              # Page components (Home, Login, Register, Vaults)
-├── Controllers/            # Presentation layer (namespace: PassManAPI.Controllers)
-│   ├── AuditController.cs
+├── Controllers/       # API endpoints
 │   ├── AuthController.cs
-│   ├── # API endpoint controllers
+│   ├── VaultsController.cs
+│   ├── CredentialsController.cs
+│   ├── InvitationsController.cs
+│   ├── TagsController.cs
+│   ├── AuditController.cs
 │   └── ...
-├── Helpers/                # Helper/utility classes (namespace: PassManAPI.Helpers)
-│   ├── SqlTest.cs
+├── Models/           # Domain entities
+│   ├── User.cs
+│   ├── Vault.cs
+│   ├── Credential.cs
+│   ├── SubscriptionTier.cs
+│   ├── Attachment.cs
+│   ├── Invitation.cs
 │   └── ...
-├── Managers/               # Business layer (namespace: PassManAPI.Managers) 
-│   ├── # Logic core classes
-│   └── ...
-├── Models/                 # Data access layers (namespace: PassManAPI.Models)
-│   ├── # ORM definitions, DB connections...
-│   └── ...
-├── Properties/             # Project properties and launch settings
-├── wwwroot/                # Static files (CSS, JS, images)
-├── Program.cs              # Application entry point
-├── appsettings.json        # Configuration settings
-└── PassManAPI.csproj       # Project file
+├── Managers/         # Business logic
+├── Data/            # EF Core context and migrations
+├── Services/        # JWT, email, etc.
+└── DTOs/            # Request/response models
+
+PassManGUI/
+├── Components/
+│   ├── Pages/       # Blazor pages
+│   └── Layout/      # Layout components
+└── Services/        # API client services
+
+PassManAPI.Tests/    # Integration tests
+└── *.cs            # 106 passing tests
 ```
 
-### Namespace Conventions
-- **Controllers**: `PassManAPI.Controllers`
-- **Models**: `PassManAPI.Models`
-- **Helpers**: `PassManAPI.Helpers`
-- **Components**: `PassManAPI.Components`
+## 📝 API Endpoints
 
-## Project Status
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - Login with JWT
+- `POST /api/auth/google-login` - Google OAuth login
+- `GET /api/auth/me` - Get current user profile
 
-This board tracks the current development progress.
+### Vaults
+- `GET /api/vaults` - List user's vaults
+- `POST /api/vaults` - Create vault
+- `GET /api/vaults/{id}` - Get vault details
+- `PUT /api/vaults/{id}` - Update vault
+- `DELETE /api/vaults/{id}` - Delete vault
 
-### In Progress
+### Credentials
+- `GET /api/credentials?vaultId={id}` - List credentials
+- `POST /api/credentials` - Create credential
+- `GET /api/credentials/{id}` - Get credential
+- `PUT /api/credentials/{id}` - Update credential
+- `DELETE /api/credentials/{id}` - Delete credential
 
-#### Documentation
-- [x] Architecture Diagram
-- [ ] Entity Relationship Diagram (ERD)
-- [ ] Class Diagram
+### Vault Sharing & Invitations
+- `POST /api/vaults/{id}/share` - Share vault
+- `GET /api/invitations` - List invitations
+- `POST /api/invitations/{id}/accept` - Accept invitation
+- `POST /api/invitations/{id}/revoke` - Revoke invitation
 
-#### Infrastructure
-- [x] Setup ASP.NET Core Web API project structure
-- [x] Setup a Dockerfile for the API host
-- [x] Setup Swagger/OpenAPI for API documentation
+### Tags & Categories
+- `GET /api/tags` - List tags
+- `POST /api/tags` - Create tag
+- `PUT /api/tags/{id}` - Update tag
+- `DELETE /api/tags/{id}` - Delete tag
 
-### Upcoming
-- [ ] Configure PostgreSQL database with Entity Framework Core
-- [ ] Implement basic user registration and JWT authentication
+### Audit
+- `GET /api/audit/logs` - View audit logs (admin only)
 
-## API Documentation
+## 🧪 Testing
 
-To access the Swagger documentation for the API, run the application and navigate to `/swagger` in your browser.
+### Test Coverage
+- **106 passing tests** with 0 failures
+- Integration tests using in-memory SQLite
+- No MySQL dependency for tests
+- Dev header authentication (`X-UserId`)
 
-- **URL**: `http://localhost:5246/swagger`
+### Running Tests
 
-This will display the Swagger UI, which provides detailed information about the available endpoints, models, and allows you to interact with the API directly.
-
-## Testing
-
-Integration tests live in `PassManAPI.Tests` and run the API with a test `WebApplicationFactory` using in-memory SQLite (no MySQL needed).
-
-### Running Tests in Docker (Recommended)
-
-To avoid file permission conflicts between Docker and local builds, run tests inside a Docker container:
-
+**Docker (Recommended):**
 ```bash
 docker-compose run --rm test
 ```
 
-**What this does:**
-- Runs tests in an isolated container environment
-- Automatically cleans up the container after tests complete (`--rm`)
-- Prevents `obj/bin` permission issues when switching between Docker and local development
-- Uses the same test configuration as CI/CD pipelines
-
-**Additional options:**
-
+**Local:**
 ```bash
-# Run tests with watch mode (auto-rerun on file changes)
-docker-compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
-
-# Run specific test class
-docker-compose run --rm test dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
-
-# Use the helper script
-./scripts/test.fish docker        # Run tests in Docker
-./scripts/test.fish watch         # Run with watch mode
-./scripts/test.fish local         # Run locally (auto-cleans first)
-./scripts/test.fish clean         # Clean all build artifacts
-```
-
-### Running Tests Locally
-
-If you need to run tests locally (outside Docker):
-
-```bash
-# Clean build artifacts first to avoid permission issues
+# Clean first
 rm -rf PassManAPI/obj PassManAPI/bin PassManAPI.Tests/obj PassManAPI.Tests/bin
 
 # Run tests
 dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 ```
 
-### Why Docker for Tests?
-
-When you run `docker compose up` to start the API, Docker creates `obj/` and `bin/` directories owned by the container user. Later running `dotnet test` locally fails with permission errors because your local user can't write to those directories.
-
-**The solution:** Run tests in Docker using volume exclusions (configured in `docker-compose.yml`) to keep Docker and local build artifacts separate:
-
-```yaml
-test:
-  volumes:
-    - .:/workspace
-    # Exclude build artifacts to prevent permission issues
-    - /workspace/PassManAPI/obj
-    - /workspace/PassManAPI/bin
-    - /workspace/PassManAPI.Tests/obj
-    - /workspace/PassManAPI.Tests/bin
+**Watch Mode:**
+```bash
+docker-compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
 ```
 
-This way:
-- ✅ Docker tests use containerized build artifacts
-- ✅ Local tests use local build artifacts  
-- ✅ No permission conflicts between the two 
+**Specific Tests:**
+```bash
+dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
+```
+
+### Test Categories
+- **AuthEndpointsTests**: Registration, login, JWT validation
+- **SubscriptionTierTests**: Tier seeding and assignment
+- **VaultEndpointsTests**: CRUD operations and permissions
+- **CredentialsEndpointsTests**: Credential management
+- **InvitationTests**: Vault sharing workflows
+- **AttachmentModelTests**: File attachment handling
+- **AuthorizationPolicyTests**: Role-based access control
+
+## 📚 Documentation
+
+- **[API_INTEGRATION_SUMMARY.md](/API_INTEGRATION_SUMMARY.md)** - Frontend-backend integration
+- **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** - Testing strategies and commands
+- **[BACKUP_RECOVERY.md](/BACKUP_RECOVERY.md)** - Database backup procedures
+- **[ProjectSummary.md](/ProjectSummary.md)** - Feature breakdown and roadmap
+- **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
+- **Swagger UI**: http://localhost:5246/swagger
+
+## 🎯 Current Features
+
+### ✅ Implemented
+- User authentication (JWT + Google OAuth)
+- Vault management with CRUD operations
+- Credential storage with encryption
+- Tag-based organization
+- **Subscription tiers** (Free/Premium)
+- **Vault sharing via invitations**
+- **File attachments** for credentials
+- Role-based access control
+- Audit logging
+- Blazor frontend with real-time updates
+
+### 🚧 In Progress
+- Password strength analysis
+- Enhanced search and filtering
+- Password generator
+- Breach monitoring integration
+
+## 🛠️ Development
+
+### Adding New Permissions
+1. Update [`PassManAPI/Models/Permissions.cs`](PassManAPI/Models/Permissions.cs)
+2. Restart API - seeder will attach to roles automatically
+
+### Database Migrations
+```bash
+# Add migration
+dotnet ef migrations add MigrationName --project PassManAPI
+
+# Apply migration
+dotnet ef database update --project PassManAPI
+```
+
+### Code Quality
+- All code follows C# naming conventions
+- Integration tests required for new endpoints
+- Swagger documentation auto-generated
+
+## 📄 License
+
+This project is for educational purposes as part of a university course.
+
+## 👥 Contributors
+
+Data Processing course team @ University
