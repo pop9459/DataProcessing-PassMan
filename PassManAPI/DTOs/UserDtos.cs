@@ -42,6 +42,12 @@ public class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
+public class RefreshTokenRequest
+{
+    [Required]
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
 public class UpdateProfileRequest
 {
     [EmailAddress]
@@ -79,6 +85,9 @@ public class UserProfileResponse
 public class AuthResponse
 {
     public string AccessToken { get; set; } = string.Empty;
+    public string? RefreshToken { get; set; }
+    public DateTime? AccessTokenExpiresAt { get; set; }
+    public DateTime? RefreshTokenExpiresAt { get; set; }
     public UserProfileResponse User { get; set; } = new();
 }
 

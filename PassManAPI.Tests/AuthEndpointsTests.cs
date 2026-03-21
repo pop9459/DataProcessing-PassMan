@@ -100,6 +100,26 @@ public class AuthEndpointsTests : IClassFixture<TestWebApplicationFactory>
         meResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Refresh_Returns_New_Access_And_Refresh_Tokens()
+    {
+        var reg = await RegisterAndGet();
+        reg.RefreshToken.Should().NotBeNullOrWhiteSpace();
+
+        var refreshResponse = await _client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest
+        {
+            RefreshToken = reg.RefreshToken!
+        });
+
+        refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var refreshed = await refreshResponse.Content.ReadFromJsonAsync<AuthResponse>(_jsonOptions);
+        refreshed.Should().NotBeNull();
+        refreshed!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        refreshed.RefreshToken.Should().NotBeNullOrWhiteSpace();
+        refreshed.RefreshToken.Should().NotBe(reg.RefreshToken);
+        refreshed.User.Id.Should().Be(reg.User.Id);
+    }
+
     private static RegisterRequest NewRegister(string email) =>
         new()
         {

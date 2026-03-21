@@ -2,6 +2,15 @@
 
 Scope is MySQL (prod/stage). Test/SQLite is excluded.
 
+## Design rationale
+- Why logical dumps + binlogs: logical dumps are portable across host/container setups and easy to validate in CI or throwaway containers, while binlogs provide point-in-time recovery between nightly snapshots.
+- Why not backup files only: raw file-copy backups are tightly coupled to MySQL version and storage engine internals; recovery is harder to rehearse for class/demo environments.
+- Risk model addressed: accidental deletes, bad deploy migrations, and operator mistakes are covered through nightly full backups plus PITR.
+- Recovery objectives:
+  - RPO target: <= 24h from nightly full dump, usually much lower when binlogs are available.
+  - RTO target: <= 60 minutes for full restore + smoke validation on current dataset sizes.
+- Restore confidence: backup is considered successful only after restore verification (table check + API smoke tests), not after dump command completion.
+
 ## Backup strategy
 - Type: Logical backups with `mysqldump` (schema + data) plus binlog-based point-in-time recovery (PITR).
 - Frequency: Full dump nightly; incremental via binlogs retained 7–14 days (adjust per storage).

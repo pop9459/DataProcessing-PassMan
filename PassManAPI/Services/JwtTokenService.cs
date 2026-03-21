@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Linq;
 using System.Text;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using PassManAPI.Models;
@@ -10,26 +12,34 @@ namespace PassManAPI.Services;
 public interface IJwtTokenService
 {
     // Issues a short-lived access token for the given user.
-    string CreateAccessToken(User user);
+    Task<string> CreateAccessToken(User user);
     // Overload used when we only have a response DTO, not the full entity.
-    string CreateAccessToken(int userId, string email, string? userName);
+    Task<string> CreateAccessToken(int userId, string email, string? userName);
 }
 
 public class JwtTokenService : IJwtTokenService
 {
     private readonly JwtOptions _options;
+    private readonly UserManager<User> _userManager;
+    private readonly RoleManager<IdentityRole<int>> _roleManager;
 
-    public JwtTokenService(IOptions<JwtOptions> options)
+    public JwtTokenService(
+        IOptions<JwtOptions> options,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole<int>> roleManager
+    )
     {
         _options = options.Value;
+        _userManager = userManager;
+        _roleManager = roleManager;
     }
 
-    public string CreateAccessToken(User user)
+    public async Task<string> CreateAccessToken(User user)
     {
-        return CreateAccessToken(user.Id, user.Email ?? string.Empty, user.UserName);
+        return await CreateAccessToken(user.Id, user.Email ?? string.Empty, user.UserName);
     }
 
-    public string CreateAccessToken(int userId, string email, string? userName)
+    public async Task<string> CreateAccessToken(int userId, string email, string? userName)
     {
         if (string.IsNullOrWhiteSpace(_options.SigningKey))
         {
@@ -50,6 +60,9 @@ public class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        // Mirror policy claims expected by authorization handlers.
+        claims.AddRange(await BuildRoleAndPermissionClaimsAsync(userId));
+
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,
             audience: _options.Audience,
@@ -60,5 +73,40 @@ public class JwtTokenService : IJwtTokenService
 
         // Serialize JWT for the client to send as Bearer token.
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private async Task<IEnumerable<Claim>> BuildRoleAndPermissionClaimsAsync(int userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            return Array.Empty<Claim>();
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var claims = new List<Claim>();
+        var seenPermissions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var roleName in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, roleName));
+
+            var role = await _roleManager.FindByNameAsync(roleName);
+            if (role is null)
+            {
+                continue;
+            }
+
+            var roleClaims = await _roleManager.GetClaimsAsync(role);
+            foreach (var roleClaim in roleClaims.Where(c => c.Type == PermissionConstants.ClaimType))
+            {
+                if (seenPermissions.Add(roleClaim.Value))
+                {
+                    claims.Add(new Claim(PermissionConstants.ClaimType, roleClaim.Value));
+                }
+            }
+        }
+
+        return claims;
     }
 }

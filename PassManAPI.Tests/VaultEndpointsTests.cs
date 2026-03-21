@@ -61,6 +61,23 @@ public class VaultEndpointsTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Owner_Can_Create_Vault_With_Jwt_Bearer()
+    {
+        var owner = await RegisterAsync("vault-owner-jwt-create@test.local");
+
+        var create = new { name = "JWT Owner Vault", description = "created with bearer", userId = owner.User.Id };
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(create)
+        };
+        createReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", owner.AccessToken);
+
+        var createResp = await _client.SendAsync(createReq);
+
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
     public async Task Shared_User_Can_List_And_Get_But_Cannot_Update_Delete()
     {
         var owner = await RegisterAsync("vault-share-owner@test.local");

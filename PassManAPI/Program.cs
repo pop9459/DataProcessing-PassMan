@@ -38,11 +38,24 @@ public class Program
             );
         });
 
-        // Add the DB Context (use Sqlite for tests, MySQL otherwise)
-        if (builder.Environment.IsEnvironment("Test"))
+        var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+        var isTestEnv = builder.Environment.IsEnvironment("Test");
+        var useLocalSqliteInDevelopment =
+            builder.Environment.IsDevelopment()
+            && (
+                defaultConnection.Contains("Server=localhost", StringComparison.OrdinalIgnoreCase)
+                || defaultConnection.Contains("Host=localhost", StringComparison.OrdinalIgnoreCase)
+            );
+
+        if (isTestEnv)
         {
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite("DataSource=:memory:"));
+        }
+        else if (useLocalSqliteInDevelopment)
+        {
+            builder.Services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlite("Data Source=passman-dev.db"));
         }
         else
         {
@@ -88,8 +101,7 @@ public class Program
 
         // Authentication: JWT Bearer as primary, with DevHeader for test backward compat
         // Use policy scheme in Test environment to auto-select based on Authorization header
-        var isTestEnv = builder.Environment.IsEnvironment("Test");
-        
+
         builder.Services
             .AddAuthentication(options =>
             {
@@ -213,8 +225,16 @@ public class Program
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             try
             {
-                // Apply pending migrations so Identity + domain tables exist
-                await dbContext.Database.MigrateAsync();
+                if (dbContext.Database.IsSqlite())
+                {
+                    // SQLite local/dev path: ensure schema exists without requiring provider-specific migrations.
+                    await dbContext.Database.EnsureCreatedAsync();
+                }
+                else
+                {
+                    // MySQL path: apply pending migrations so Identity + domain tables exist.
+                    await dbContext.Database.MigrateAsync();
+                }
 
                 // Test the database connection
                 var canConnect = await dbContext.Database.CanConnectAsync();
@@ -233,7 +253,7 @@ public class Program
             }
         }
 
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment() && !useLocalSqliteInDevelopment)
         {
             // Call DB to test the connectivity
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")

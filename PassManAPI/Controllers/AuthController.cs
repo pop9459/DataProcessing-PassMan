@@ -9,6 +9,8 @@ using PassManAPI.Managers;
 using PassManAPI.Services;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Google.Apis.Auth;
 
@@ -20,6 +22,11 @@ namespace PassManAPI.Controllers;
 public class AuthController : ControllerBase
 {
     private const string DefaultRole = "VaultOwner";
+    private static readonly ConcurrentDictionary<string, RefreshTokenRecord> RefreshTokens = new();
+    private static readonly TimeSpan RefreshTokenTtl = TimeSpan.FromDays(7);
+
+    private record RefreshTokenRecord(int UserId, DateTime ExpiresAtUtc);
+
     private readonly ApplicationDbContext _db;
     private readonly PassManAPI.Managers.UserManager _userManager;
     private readonly Microsoft.AspNetCore.Identity.UserManager<User> _identityUserManager;
@@ -89,7 +96,7 @@ public class AuthController : ControllerBase
             return BadRequest(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
 
-        var token = _jwtTokenService.CreateAccessToken(
+        var token = await _jwtTokenService.CreateAccessToken(
             result.Data.Id,
             result.Data.Email,
             result.Data.UserName
@@ -97,6 +104,9 @@ public class AuthController : ControllerBase
         var response = new AuthResponse
         {
             AccessToken = token,
+            RefreshToken = IssueRefreshToken(result.Data.Id),
+            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
+            RefreshTokenExpiresAt = DateTime.UtcNow.Add(RefreshTokenTtl),
             User = ToProfile(result.Data)
         };
         return CreatedAtAction(nameof(GetCurrentUser), new { }, response);
@@ -147,10 +157,13 @@ public class AuthController : ControllerBase
         user.LastLoginAt = DateTime.UtcNow;
         await _identityUserManager.UpdateAsync(user);
 
-        var token = _jwtTokenService.CreateAccessToken(user);
+        var token = await _jwtTokenService.CreateAccessToken(user);
         return Ok(new AuthResponse
         {
             AccessToken = token,
+            RefreshToken = IssueRefreshToken(user.Id),
+            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
+            RefreshTokenExpiresAt = DateTime.UtcNow.Add(RefreshTokenTtl),
             User = ToProfile(user)
         });
     }
@@ -207,10 +220,13 @@ public class AuthController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            var token = _jwtTokenService.CreateAccessToken(user);
+            var token = await _jwtTokenService.CreateAccessToken(user);
             return Ok(new AuthResponse
             {
                 AccessToken = token,
+                RefreshToken = IssueRefreshToken(user.Id),
+                AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                RefreshTokenExpiresAt = DateTime.UtcNow.Add(RefreshTokenTtl),
                 User = ToProfile(user)
             });
 
@@ -397,6 +413,48 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Rotates a refresh token and returns a new access token.
+    /// </summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!RefreshTokens.TryRemove(request.RefreshToken, out var record))
+        {
+            return Unauthorized("Invalid refresh token.");
+        }
+
+        if (record.ExpiresAtUtc <= DateTime.UtcNow)
+        {
+            return Unauthorized("Refresh token expired.");
+        }
+
+        var user = await _identityUserManager.FindByIdAsync(record.UserId.ToString());
+        if (user is null)
+        {
+            return Unauthorized("User not found.");
+        }
+
+        var accessToken = await _jwtTokenService.CreateAccessToken(user);
+        return Ok(new AuthResponse
+        {
+            AccessToken = accessToken,
+            RefreshToken = IssueRefreshToken(user.Id),
+            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(60),
+            RefreshTokenExpiresAt = DateTime.UtcNow.Add(RefreshTokenTtl),
+            User = ToProfile(user)
+        });
+    }
+
+    /// <summary>
     /// Assigns a role to a user, replacing any existing roles (Admin only).
     /// </summary>
     [HttpPost("assign-role")]
@@ -444,6 +502,14 @@ public class AuthController : ControllerBase
             await _roleManager.CreateAsync(new IdentityRole<int>(roleName));
         }
         return await _identityUserManager.AddToRoleAsync(user, roleName);
+    }
+
+    private static string IssueRefreshToken(int userId)
+    {
+        var rawToken = RandomNumberGenerator.GetBytes(64);
+        var token = Convert.ToBase64String(rawToken);
+        RefreshTokens[token] = new RefreshTokenRecord(userId, DateTime.UtcNow.Add(RefreshTokenTtl));
+        return token;
     }
 }
 

@@ -238,6 +238,9 @@ _pkginfo.txt
 !?*.[Cc]ache/
 
 # Others
+
+# Local development database
+PassManAPI/passman-dev.db
 ClientBin/
 ~$*
 *~
