@@ -95,7 +95,7 @@ This document summarizes the API integration work completed for connecting the P
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         PassManGUI                          │
-│                    (Blazor Server - .NET 9)                 │
+│                    (Blazor Server - .NET 10)                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Pages:                                                     │
@@ -117,7 +117,7 @@ This document summarizes the API integration work completed for connecting the P
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                         PassManAPI                          │
-│                   (ASP.NET Core - .NET 9)                   │
+│                   (ASP.NET Core - .NET 10)                  │
 ├─────────────────────────────────────────────────────────────┤
 │  Controllers:                                               │
 │  ├─ /api/auth/login                                         │

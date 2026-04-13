@@ -46,7 +46,41 @@ Plain, explicit, and structured so we can extend it easily. All sections follow 
   - Sharing to a nonexistent user returns 404.
 
 ### How to run automated tests
-From repo root:
+
+Docker (recommended) — isolated, repeatable, no host SDK required
+
+Prerequisites: Docker Desktop (or another Docker runtime) installed and running.
+
+From the repo root run:
+
+```bash
+docker compose up --build --abort-on-container-exit --exit-code-from test test
+```
+
+Notes:
+- The compose `test` service runs the `mcr.microsoft.com/dotnet/sdk:10.0` image so you do not need .NET 10 installed locally.
+- The command returns the test container exit code (non-zero on failures) so CI/teacher VMs detect pass/fail.
+- The test service is configured to use a normal test logger verbosity and reduced ASP.NET/EF log levels to limit noise.
+
+Single-container alternative (no compose)
+
+```powershell
+docker run --rm -v "${PWD}:/workspace" -w /workspace mcr.microsoft.com/dotnet/sdk:10.0 dotnet test "PassManAPI.Tests/PassManAPI.Tests.csproj" --logger "console;verbosity=normal"
+```
+
+Local (optional) — requires .NET 10 SDK
+
+If you prefer running tests on your host machine you must have the .NET 10 SDK installed. Check SDKs with:
+
+```
+dotnet --list-sdks
+dotnet --info
+```
+
+If you don't have .NET 10 installed, download it from https://aka.ms/dotnet/download. The repo includes a `global.json` to pin an SDK version for reproducible local builds; update or remove it if your installed SDK differs from the pinned version.
+
+Run locally from the repo root:
+
 ```
 dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 ```
@@ -73,13 +107,12 @@ dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 - Sharing works: share grants visibility; revoke removes it.
 
 ## Troubleshooting
-- “Failed to load vaults/credentials”: ensure API running; check 404/403 vs 500; inspect logs.
-- “Network request failed”: API not running; check `docker-compose ps`; firewall/ports.
-- “User not found”: apply migrations; inspect Users table.
-- Empty vaults but data exists: verify `X-UserId`; curl `/api/vaults`.
-- Build errors: `dotnet clean; dotnet build`; confirm Program.cs service registrations/usings.
 
-## Next steps (process)
+
+Additional Docker troubleshooting tips
+- If the test container reports an SDK mismatch (`Requested SDK version`), update `global.json` to match the SDK available in the container (or remove `global.json`), or use an image tag that matches the pinned SDK.
+- On Windows, path mounts can require quoting as shown in the PowerShell example; if volume mounts fail, ensure Docker Desktop has file sharing / permissions enabled for the repo path.
+- If tests or the container are unexpectedly slow or fail due to resource limits, increase Docker Desktop resources (CPU/memory) temporarily.
 1) Run tests (`dotnet test ...`).
 2) If adding new features, add/extend integration tests in PassManAPI.Tests.
 3) When ready, commit/push and open PR; include what was tested.

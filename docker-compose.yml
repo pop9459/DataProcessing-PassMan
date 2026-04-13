@@ -51,6 +51,9 @@ services:
     working_dir: /workspace
     environment:
       - ASPNETCORE_ENVIRONMENT=Test
+      - Logging__LogLevel__Default=Warning
+      - Logging__LogLevel__Microsoft=Warning
+      - Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
     volumes:
       - .:/workspace
       # Exclude build artifacts to prevent permission issues
@@ -59,7 +62,7 @@ services:
       - /workspace/PassManAPI.Tests/obj
       - /workspace/PassManAPI.Tests/bin
     entrypoint: ["dotnet"]
-    command: test PassManAPI.Tests/PassManAPI.Tests.csproj --logger "console;verbosity=detailed"
+    command: test PassManAPI.Tests/PassManAPI.Tests.csproj --logger "console;verbosity=normal"
     profiles:
       - test
 

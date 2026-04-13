@@ -22,6 +22,7 @@ A secure password management system built as a RESTful API in C#. Users can regi
 - **API Documentation**: Swagger/OpenAPI (Swashbuckle)
 - **Security**: AES encryption for stored credentials, password hashing (ASP.NET Core Identity)
 - **Testing**: xUnit with FluentAssertions (106 passing tests)
+	- See `TESTING_GUIDE.md` for Docker-first test instructions and reproducible commands.
 
 ***
 

@@ -225,8 +225,10 @@ PassManAPI.Tests/    # Integration tests
 ### Running Tests
 
 **Docker (Recommended):**
+See `TESTING_GUIDE.md` for the recommended Docker-first test workflow.
+
 ```bash
-docker-compose run --rm test
+docker compose up --build --abort-on-container-exit --exit-code-from test test
 ```
 
 **Local:**
@@ -240,7 +242,7 @@ dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 
 **Watch Mode:**
 ```bash
-docker-compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
+docker compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
 ```
 
 **Specific Tests:**
