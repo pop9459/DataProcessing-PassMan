@@ -411,3 +411,5 @@ appsettings.*.json
 
 # Test Output
 test_output.txt
+# Analysis and documentation (non-production)
+.analysis/
