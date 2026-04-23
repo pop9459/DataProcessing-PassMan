@@ -18,7 +18,7 @@ namespace PassManAPI.Data
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Tag> Tags { get; set; }
         public DbSet<CredentialTag> CredentialTags { get; set; }
-
+        public DbSet<SubscriptionTier> SubscriptionTiers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -142,6 +142,18 @@ namespace PassManAPI.Data
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
+
+            // SubscriptionTier configurations
+            modelBuilder
+                .Entity<User>()
+                .HasOne(u => u.SubscriptionTier)
+                .WithMany(st => st.Users)
+                .HasForeignKey(u => u.SubscriptionTierId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Seed default subscription tiers
+            modelBuilder.Entity<SubscriptionTier>().HasData(SubscriptionTier.DefaultTiers);
+
         }
     }
 }
