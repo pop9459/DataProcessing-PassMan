@@ -89,11 +89,7 @@ public class AuthController : ControllerBase
             return BadRequest(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
 
-        var token = _jwtTokenService.CreateAccessToken(
-            result.Data.Id,
-            result.Data.Email,
-            result.Data.UserName
-        );
+        var token = await _jwtTokenService.CreateAccessTokenAsync(identityUser);
         var response = new AuthResponse
         {
             AccessToken = token,
@@ -147,7 +143,7 @@ public class AuthController : ControllerBase
         user.LastLoginAt = DateTime.UtcNow;
         await _identityUserManager.UpdateAsync(user);
 
-        var token = _jwtTokenService.CreateAccessToken(user);
+        var token = await _jwtTokenService.CreateAccessTokenAsync(user);
         return Ok(new AuthResponse
         {
             AccessToken = token,
@@ -207,7 +203,7 @@ public class AuthController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            var token = _jwtTokenService.CreateAccessToken(user);
+            var token = await _jwtTokenService.CreateAccessTokenAsync(user);
             return Ok(new AuthResponse
             {
                 AccessToken = token,
