@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
 using PassManAPI.Services;
 using System.Security.Claims;
@@ -43,13 +44,13 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var canAccess = await CanAccessVault(vaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var items = await _db.Credentials
@@ -100,13 +101,13 @@ public class CredentialsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var canAccess = await CanAccessVault(vaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         // Generate a per-credential encryption key (32 bytes)
@@ -157,7 +158,7 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials
@@ -166,13 +167,13 @@ public class CredentialsController : ControllerBase
 
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         // Update last accessed timestamp
@@ -229,19 +230,19 @@ public class CredentialsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         credential.Title = update.Title.Trim();
@@ -280,19 +281,19 @@ public class CredentialsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         // Generate a new per-credential encryption key
@@ -328,19 +329,19 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         _db.Credentials.Remove(credential);
@@ -366,7 +367,7 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials
@@ -377,13 +378,13 @@ public class CredentialsController : ControllerBase
 
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var tags = credential.CredentialTags
@@ -419,7 +420,7 @@ public class CredentialsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials
@@ -428,13 +429,13 @@ public class CredentialsController : ControllerBase
 
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         // Validate all tag ids belong to the current user
@@ -447,7 +448,7 @@ public class CredentialsController : ControllerBase
         var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
         if (invalidTagIds.Any())
         {
-            return BadRequest($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
+            return this.BadRequestProblem($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
         }
 
         // Remove existing tags
@@ -493,37 +494,37 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound("Credential not found.");
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var tag = await _db.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tagId);
         if (tag is null)
         {
-            return NotFound("Tag not found.");
+            return this.NotFoundProblem("Tag not found.");
         }
 
         if (tag.UserId != currentUserId)
         {
-            return BadRequest("Tag does not belong to the current user.");
+            return this.BadRequestProblem("Tag does not belong to the current user.");
         }
 
         var existing = await _db.CredentialTags
             .AnyAsync(ct => ct.CredentialId == id && ct.TagId == tagId);
         if (existing)
         {
-            return BadRequest("Tag is already assigned to this credential.");
+            return this.BadRequestProblem("Tag is already assigned to this credential.");
         }
 
         _db.CredentialTags.Add(new CredentialTag(id, tagId));
@@ -551,26 +552,26 @@ public class CredentialsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound("Credential not found.");
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var credentialTag = await _db.CredentialTags
             .FirstOrDefaultAsync(ct => ct.CredentialId == id && ct.TagId == tagId);
         if (credentialTag is null)
         {
-            return NotFound("Tag is not assigned to this credential.");
+            return this.NotFoundProblem("Tag is not assigned to this credential.");
         }
 
         _db.CredentialTags.Remove(credentialTag);

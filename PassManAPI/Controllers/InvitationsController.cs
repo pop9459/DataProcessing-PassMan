@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
 using System.Security.Claims;
 
@@ -32,7 +33,10 @@ namespace PassManAPI.Controllers
                 return BadRequest(ModelState);
             }
 
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
 
             // Verify vault ownership or admin access
             var vault = await _context.Vaults
@@ -94,7 +98,10 @@ namespace PassManAPI.Controllers
             if (string.IsNullOrEmpty(userEmail))
             {
                 // Fallback if email claim is missing (should verify user load)
-                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+                if (!TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
                 var user = await _userManager.FindByIdAsync(userId.ToString());
                 userEmail = user!.Email;
             }
@@ -121,7 +128,10 @@ namespace PassManAPI.Controllers
         [HttpPost("{token}/accept")]
         public async Task<IActionResult> AcceptInvitation(string token)
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
             var user = await _userManager.FindByIdAsync(userId.ToString());
             
             var invitation = await _context.Invitations
@@ -183,7 +193,10 @@ namespace PassManAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> RevokeInvitation(int id)
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
 
             var invitation = await _context.Invitations
                 .Include(i => i.Vault)
@@ -210,6 +223,13 @@ namespace PassManAPI.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private bool TryGetCurrentUserId(out int userId)
+        {
+            userId = 0;
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+            return claim != null && int.TryParse(claim.Value, out userId);
         }
     }
 }

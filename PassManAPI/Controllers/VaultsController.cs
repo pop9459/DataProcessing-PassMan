@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PassManAPI.Data;
+using PassManAPI.Helpers;
 using PassManAPI.Managers;
 using PassManAPI.Models;
 
@@ -33,13 +34,13 @@ public class VaultsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _vaultManager.GetUserVaultsAsync(currentUserId);
         if (!result.Success)
         {
-            return BadRequest(result.Error);
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         var response = result.Data!.Select(ToResponse).ToList();
@@ -61,7 +62,7 @@ public class VaultsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _vaultManager.GetVaultByIdAsync(id, currentUserId);
@@ -69,13 +70,13 @@ public class VaultsController : ControllerBase
         {
             if (result.Error == "Vault not found.")
             {
-                return NotFound();
+                return this.NotFoundProblem("Vault not found.");
             }
             if (result.Error == "Access denied.")
             {
-                return Forbid();
+                return this.ForbiddenProblem();
             }
-            return BadRequest(result.Error);
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         return Ok(ToResponse(result.Data!));
@@ -99,13 +100,13 @@ public class VaultsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Ensure user can only create vaults for themselves
         if (request.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var result = await _vaultManager.CreateVaultAsync(
@@ -116,7 +117,7 @@ public class VaultsController : ControllerBase
 
         if (!result.Success)
         {
-            return BadRequest(result.Error);
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         await LogAudit(AuditAction.VaultCreated, currentUserId, nameof(Vault), result.Data!.Id, $"Vault '{result.Data.Name}' created");
@@ -147,7 +148,7 @@ public class VaultsController : ControllerBase
 
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _vaultManager.UpdateVaultAsync(
@@ -161,13 +162,13 @@ public class VaultsController : ControllerBase
         {
             if (result.Error == "Vault not found.")
             {
-                return NotFound();
+                return this.NotFoundProblem("Vault not found.");
             }
             if (result.Error == "Only the vault owner can update the vault.")
             {
-                return Forbid();
+                return this.ForbiddenProblem();
             }
-            return BadRequest(result.Error);
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         await LogAudit(AuditAction.VaultUpdated, currentUserId, nameof(Vault), id, $"Vault '{result.Data!.Name}' updated");
@@ -190,7 +191,7 @@ public class VaultsController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Get vault name before deletion for audit log
@@ -202,13 +203,13 @@ public class VaultsController : ControllerBase
         {
             if (result.Error == "Vault not found.")
             {
-                return NotFound();
+                return this.NotFoundProblem("Vault not found.");
             }
             if (result.Error == "Only the vault owner can delete the vault.")
             {
-                return Forbid();
+                return this.ForbiddenProblem();
             }
-            return BadRequest(result.Error);
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         await LogAudit(AuditAction.VaultDeleted, currentUserId, nameof(Vault), id, $"Vault '{vaultName}' deleted (soft delete)");

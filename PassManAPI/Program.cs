@@ -18,6 +18,8 @@ using PassManAPI.Managers;
 using PassManAPI.Middleware;
 using PassManAPI.Services;
 using PassManAPI.Validators;
+using PassManAPI.DTOs;
+using System.Linq;
 
 public class Program
 {
@@ -28,6 +30,27 @@ public class Program
         // Add services to the container.
         builder.Services.AddControllers()           // Register MVC controllers
             .AddXmlSerializerFormatters();          // Enable XML serialization support
+
+        // Standardize automatic model-validation (400) responses to the ErrorResponse shape
+        // so validation errors match every other error in the API (see #162/#163).
+        builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var traceId = System.Diagnostics.Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+                var errors = context.ModelState
+                    .Where(kvp => kvp.Value is not null && kvp.Value.Errors.Count > 0)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
+                var error = ErrorResponse.ValidationError(errors, traceId);
+                // No explicit ContentTypes: let content negotiation pick JSON or XML.
+                return new Microsoft.AspNetCore.Mvc.ObjectResult(error)
+                {
+                    StatusCode = StatusCodes.Status400BadRequest
+                };
+            };
+        });
         builder.Services.AddEndpointsApiExplorer(); // Enable API explorer for minimal API metadata
         builder.Services.AddSwaggerGen(options =>
         {

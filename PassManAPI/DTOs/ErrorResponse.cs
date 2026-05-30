@@ -43,6 +43,7 @@ public class ErrorResponse
     /// </summary>
     [JsonPropertyName("errors")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [System.Xml.Serialization.XmlIgnore] // Dictionary is not XML-serializable; errors are JSON-only.
     public Dictionary<string, string[]>? Errors { get; set; }
 
     /// <summary>

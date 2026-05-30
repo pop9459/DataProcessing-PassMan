@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Managers;
 using PassManAPI.Models;
 
@@ -62,19 +63,19 @@ public class UserController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own profile, or admins can view any profile
         if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var result = await _userManager.GetUserByIdAsync(id);
         if (!result.Success || result.Data is null)
         {
-            return NotFound(result.Error ?? "User not found.");
+            return this.NotFoundProblem(result.Error ?? "User not found.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -98,13 +99,13 @@ public class UserController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can update their own profile, or admins can update any profile
         if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var updateRequest = new UpdateUserRequest(
@@ -119,9 +120,9 @@ public class UserController : ControllerBase
         {
             if (result.Error?.Contains("not found") == true)
             {
-                return NotFound(result.Error);
+                return this.NotFoundProblem(result.Error ?? "User not found.");
             }
-            return BadRequest(result.Error ?? "Update failed.");
+            return this.BadRequestProblem(result.Error ?? "Update failed.");
         }
 
         await LogAuditAsync(AuditAction.UserPasswordChanged, currentUserId, id, "Profile updated");
@@ -143,19 +144,19 @@ public class UserController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can delete their own account, or admins can delete any account
         if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var result = await _userManager.DeleteUserAsync(id);
         if (!result.Success)
         {
-            return NotFound(result.Error ?? "User not found.");
+            return this.NotFoundProblem(result.Error ?? "User not found.");
         }
 
         return NoContent();
@@ -176,19 +177,19 @@ public class UserController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own vaults, or admins can view any user's vaults
         if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var userExists = await _db.Users.AnyAsync(u => u.Id == id);
         if (!userExists)
         {
-            return NotFound("User not found.");
+            return this.NotFoundProblem("User not found.");
         }
 
         var vaults = await _db.Vaults
@@ -215,19 +216,19 @@ public class UserController : ControllerBase
     {
         if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own tags, or admins can view any user's tags
         if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var userExists = await _db.Users.AnyAsync(u => u.Id == id);
         if (!userExists)
         {
-            return NotFound("User not found.");
+            return this.NotFoundProblem("User not found.");
         }
 
         var tags = await _db.Tags
