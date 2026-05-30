@@ -20,6 +20,7 @@ using PassManAPI.Services;
 using PassManAPI.Validators;
 using PassManAPI.DTOs;
 using System.Linq;
+using Microsoft.OpenApi;
 
 public class Program
 {
@@ -59,6 +60,19 @@ public class Program
             options.IncludeXmlComments(
                 System.IO.Path.Combine(AppContext.BaseDirectory, xmlFilename)
             );
+
+            // Make the JWT bearer token usable from the Swagger UI "Authorize" button.
+            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "Paste your JWT access token from /api/auth/login. Swagger adds the \"Bearer \" prefix automatically."
+            });
+            options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+            });
         });
 
         // Add the DB Context (use Sqlite for tests, MySQL otherwise)
@@ -202,10 +216,6 @@ public class Program
         builder.Services.AddScoped<IVaultManager, VaultManager>();
 
         // Register Security Services
-        // Additional JWT Token Service (TokenService from Services folder)
-        builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
-        builder.Services.AddScoped<ITokenService, TokenService>();
-
         // Password Encryption Service (AES-256-GCM)
         builder.Services.AddSingleton<IPasswordEncryptionService, PasswordEncryptionService>();
 
@@ -218,7 +228,6 @@ public class Program
 
         // Register Business Managers
         builder.Services.AddScoped<ISharingManager, SharingManager>();
-        builder.Services.AddScoped<IAuthManager, AuthManager>();
         builder.Services.AddScoped<ICredentialManager, CredentialManager>();
         builder.Services.AddScoped<IAuditService, AuditManager>();
 
@@ -277,31 +286,6 @@ public class Program
         // Enable swagger UI in development environment
         if (app.Environment.IsDevelopment())
         {
-            // Add JWT security scheme to Swagger JSON
-            app.Use(async (context, next) =>
-            {
-                if (!context.Request.Path.Equals("/swagger/v1/swagger.json"))
-                {
-                    await next();
-                    return;
-                }
-
-                var originalBody = context.Response.Body;
-                await using var buffer = new MemoryStream();
-                context.Response.Body = buffer;
-
-                await next();
-
-                buffer.Position = 0;
-                using var reader = new StreamReader(buffer);
-                var json = await reader.ReadToEndAsync();
-                var updated = AddJwtSecurityToSwagger(json);
-
-                context.Response.Body = originalBody;
-                context.Response.ContentLength = Encoding.UTF8.GetByteCount(updated);
-                await context.Response.WriteAsync(updated);
-            });
-
             app.UseSwagger();
             app.UseSwaggerUI();
         }
@@ -322,37 +306,5 @@ public class Program
         app.MapControllers();
 
         app.Run();
-    }
-
-    private static string AddJwtSecurityToSwagger(string json)
-    {
-        var root = JsonNode.Parse(json) as JsonObject ?? new JsonObject();
-
-        var components = root["components"] as JsonObject ?? new JsonObject();
-        var securitySchemes = components["securitySchemes"] as JsonObject ?? new JsonObject();
-
-        securitySchemes["Bearer"] = new JsonObject
-        {
-            ["type"] = "http",
-            ["scheme"] = "bearer",
-            ["bearerFormat"] = "JWT",
-            ["description"] = "Enter: Bearer {token}"
-        };
-
-        components["securitySchemes"] = securitySchemes;
-        root["components"] = components;
-
-        root["security"] = new JsonArray
-        {
-            new JsonObject
-            {
-                ["Bearer"] = new JsonArray()
-            }
-        };
-
-        return root.ToJsonString(new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
     }
 }
