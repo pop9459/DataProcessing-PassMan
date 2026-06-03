@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Managers;
 using PassManAPI.Models;
 
@@ -47,7 +48,7 @@ public class AuditController : ControllerBase
     {
         var userId = GetCurrentUserId();
         if (userId == null)
-            return Unauthorized();
+            return this.UnauthorizedProblem();
 
         var filter = new AuditLogFilter
         {
@@ -61,7 +62,7 @@ public class AuditController : ControllerBase
         var result = await _auditService.GetUserAuditLogsAsync(userId.Value, filter, page, pageSize);
 
         if (!result.Success)
-            return BadRequest(new { error = result.Error });
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
 
         return Ok(result.Data);
     }
@@ -81,17 +82,17 @@ public class AuditController : ControllerBase
     {
         var userId = GetCurrentUserId();
         if (userId == null)
-            return Unauthorized();
+            return this.UnauthorizedProblem();
 
-        var hasAuditRead = HasPermission(PermissionConstants.AuditRead);
+        var hasAuditRead = User.HasPermission(PermissionConstants.AuditRead);
 
         var result = await _auditService.GetAuditLogByIdAsync(id, userId.Value, hasAuditRead);
 
         if (!result.Success)
         {
             if (result.Error == "Audit log not found")
-                return NotFound(new { error = result.Error });
-            return Forbid();
+                return this.NotFoundProblem(result.Error ?? "Audit log not found.");
+            return this.ForbiddenProblem();
         }
 
         return Ok(result.Data);
@@ -124,7 +125,7 @@ public class AuditController : ControllerBase
     {
         var userId = GetCurrentUserId();
         if (userId == null)
-            return Unauthorized();
+            return this.UnauthorizedProblem();
 
         var filter = new AuditLogFilter
         {
@@ -138,10 +139,10 @@ public class AuditController : ControllerBase
         if (!result.Success)
         {
             if (result.Error == "Vault not found")
-                return NotFound(new { error = result.Error });
+                return this.NotFoundProblem(result.Error ?? "Audit log not found.");
             if (result.Error == "Access denied to vault audit logs")
-                return Forbid();
-            return BadRequest(new { error = result.Error });
+                return this.ForbiddenProblem();
+            return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
         return Ok(result.Data);
@@ -189,14 +190,14 @@ public class AuditController : ControllerBase
         {
             var result = await _auditService.GetUserAuditLogsAsync(userId.Value, filter, page, pageSize);
             if (!result.Success)
-                return BadRequest(new { error = result.Error });
+                return this.BadRequestProblem(result.Error ?? "Request failed.");
             return Ok(result.Data);
         }
         else
         {
             var result = await _auditService.GetAllAuditLogsAsync(filter, page, pageSize);
             if (!result.Success)
-                return BadRequest(new { error = result.Error });
+                return this.BadRequestProblem(result.Error ?? "Request failed.");
             return Ok(result.Data);
         }
     }
@@ -207,8 +208,4 @@ public class AuditController : ControllerBase
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
-    private bool HasPermission(string permission)
-    {
-        return User.Claims.Any(c => c.Type == PermissionConstants.ClaimType && c.Value == permission);
-    }
 }

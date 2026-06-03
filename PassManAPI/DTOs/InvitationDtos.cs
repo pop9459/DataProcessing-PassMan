@@ -13,7 +13,7 @@ namespace PassManAPI.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [RegularExpression("^(View|Edit|Admin)$", ErrorMessage = "Role must be View, Edit, or Admin")]
+        [RegularExpression("^(View|Edit|Admin)$", ErrorMessage = "Invalid role. Must be View, Edit, or Admin.")]
         public string Role { get; set; } = "View";
     }
 

@@ -43,6 +43,7 @@ public class ErrorResponse
     /// </summary>
     [JsonPropertyName("errors")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [System.Xml.Serialization.XmlIgnore] // Dictionary is not XML-serializable; errors are JSON-only.
     public Dictionary<string, string[]>? Errors { get; set; }
 
     /// <summary>
@@ -130,6 +131,21 @@ public class ErrorResponse
             Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
             Title = "Conflict",
             Status = 409,
+            Detail = detail,
+            TraceId = traceId
+        };
+    }
+
+    /// <summary>
+    /// Creates a Locked (423) error response (e.g. account lockout).
+    /// </summary>
+    public static ErrorResponse Locked(string detail, string? traceId = null)
+    {
+        return new ErrorResponse
+        {
+            Type = "https://tools.ietf.org/html/rfc4918#section-11.3",
+            Title = "Locked",
+            Status = 423,
             Detail = detail,
             TraceId = traceId
         };

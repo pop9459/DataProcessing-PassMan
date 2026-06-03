@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
 using System.Security.Claims;
 
@@ -27,12 +28,10 @@ namespace PassManAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateInvitation([FromBody] CreateInvitationRequest request)
         {
-            if (!ModelState.IsValid)
+            if (!User.TryGetCurrentUserId(out var userId))
             {
-                return BadRequest(ModelState);
+                return this.UnauthorizedProblem();
             }
-
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
             // Verify vault ownership or admin access
             var vault = await _context.Vaults
@@ -41,7 +40,7 @@ namespace PassManAPI.Controllers
 
             if (vault == null)
             {
-                return NotFound("Vault not found.");
+                return this.NotFoundProblem("Vault not found.");
             }
 
             // Check if user is owner or has Admin access
@@ -50,13 +49,13 @@ namespace PassManAPI.Controllers
 
             if (!isOwner && !isAdmin)
             {
-                return Forbid();
+                return this.ForbiddenProblem("You do not have permission to manage invitations for this vault.");
             }
 
             // Parse role
             if (!Enum.TryParse<AccessRole>(request.Role, true, out var role))
             {
-                return BadRequest("Invalid role.");
+                return this.BadRequestProblem("Invalid role.");
             }
 
             // Remove existing pending invitations for this email/vault
@@ -93,10 +92,16 @@ namespace PassManAPI.Controllers
             var userEmail = User.FindFirstValue(ClaimTypes.Email);
             if (string.IsNullOrEmpty(userEmail))
             {
-                // Fallback if email claim is missing (should verify user load)
-                var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+                if (!User.TryGetCurrentUserId(out var userId))
+                {
+                    return this.UnauthorizedProblem();
+                }
                 var user = await _userManager.FindByIdAsync(userId.ToString());
-                userEmail = user!.Email;
+                if (user is null)
+                {
+                    return this.UnauthorizedProblem("User not found or token invalid.");
+                }
+                userEmail = user.Email;
             }
 
             var invitations = await _context.Invitations
@@ -121,8 +126,15 @@ namespace PassManAPI.Controllers
         [HttpPost("{token}/accept")]
         public async Task<IActionResult> AcceptInvitation(string token)
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!User.TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
             var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+            {
+                return this.UnauthorizedProblem("User not found or token invalid.");
+            }
             
             var invitation = await _context.Invitations
                 .Include(i => i.Vault)
@@ -130,12 +142,12 @@ namespace PassManAPI.Controllers
 
             if (invitation == null)
             {
-                return NotFound("Invitation not found.");
+                return this.NotFoundProblem("Invitation not found.");
             }
 
             if (invitation.InvitedEmail.ToLower() != user!.Email!.ToLower())
             {
-                return BadRequest("This invitation is for a different email address.");
+                return this.BadRequestProblem("This invitation is for a different email address.");
             }
 
             try
@@ -144,7 +156,7 @@ namespace PassManAPI.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return this.BadRequestProblem(ex.Message);
             }
 
             // Create VaultShare
@@ -183,7 +195,10 @@ namespace PassManAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> RevokeInvitation(int id)
         {
-            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (!User.TryGetCurrentUserId(out var userId))
+            {
+                return this.UnauthorizedProblem();
+            }
 
             var invitation = await _context.Invitations
                 .Include(i => i.Vault)
@@ -191,7 +206,7 @@ namespace PassManAPI.Controllers
 
             if (invitation == null)
             {
-                return NotFound();
+                return this.NotFoundProblem("Invitation not found.");
             }
 
             // Check if requester is vault owner
@@ -199,11 +214,11 @@ namespace PassManAPI.Controllers
             if (invitation.Vault.UserId != userId)
             {
                 // Also check if it's the invited user declining
-                 var user = await _userManager.FindByIdAsync(userId.ToString());
-                 if (user!.Email!.ToLower() != invitation.InvitedEmail.ToLower())
-                 {
-                     return Forbid();
-                 }
+                var user = await _userManager.FindByIdAsync(userId.ToString());
+                if (user is null || user.Email!.ToLower() != invitation.InvitedEmail.ToLower())
+                {
+                    return this.ForbiddenProblem("You do not have permission to revoke this invitation.");
+                }
             }
 
             _context.Invitations.Remove(invitation);
@@ -211,5 +226,6 @@ namespace PassManAPI.Controllers
 
             return NoContent();
         }
+
     }
 }
