@@ -6,7 +6,6 @@ using PassManAPI.DTOs;
 using PassManAPI.Helpers;
 using PassManAPI.Models;
 using PassManAPI.Services;
-using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 
 namespace PassManAPI.Controllers;
@@ -42,7 +41,7 @@ public class CredentialsController : ControllerBase
     [Authorize(Policy = PermissionConstants.CredentialRead)]
     public async Task<IActionResult> Get(int vaultId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -99,7 +98,7 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -156,7 +155,7 @@ public class CredentialsController : ControllerBase
     [Authorize(Policy = PermissionConstants.CredentialRead)]
     public async Task<IActionResult> GetPassword(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -228,7 +227,7 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -279,7 +278,7 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -327,7 +326,7 @@ public class CredentialsController : ControllerBase
     [Authorize(Policy = PermissionConstants.CredentialDelete)]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -365,7 +364,7 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCredentialTags(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -418,7 +417,7 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -492,7 +491,7 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddTagToCredential(int id, int tagId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -550,7 +549,7 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveTagFromCredential(int id, int tagId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -578,13 +577,6 @@ public class CredentialsController : ControllerBase
         await _db.SaveChangesAsync();
 
         return NoContent();
-    }
-
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
     }
 
     private async Task<bool> CanAccessVault(int vaultId, int currentUserId)

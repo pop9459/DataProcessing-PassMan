@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +35,7 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<TagDto>>> GetTags()
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -67,7 +66,7 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TagDto>> GetTag(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -105,7 +104,7 @@ public class TagsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -134,7 +133,7 @@ public class TagsController : ControllerBase
             return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
         }
 
-        await LogAudit(AuditAction.TagCreated, currentUserId, nameof(Tag), tag.Id, $"Tag '{tag.Name}' created");
+        await _db.AddAuditLogAsync(AuditAction.TagCreated, currentUserId, nameof(Tag), tag.Id, $"Tag '{tag.Name}' created");
 
         var response = new TagDto(tag.Id, tag.Name);
         return CreatedAtAction(nameof(GetTag), new { id = tag.Id }, response);
@@ -164,7 +163,7 @@ public class TagsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -201,7 +200,7 @@ public class TagsController : ControllerBase
             return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
         }
 
-        await LogAudit(AuditAction.TagUpdated, currentUserId, nameof(Tag), tag.Id, $"Tag renamed from '{oldName}' to '{tag.Name}'");
+        await _db.AddAuditLogAsync(AuditAction.TagUpdated, currentUserId, nameof(Tag), tag.Id, $"Tag renamed from '{oldName}' to '{tag.Name}'");
 
         return Ok(new TagDto(tag.Id, tag.Name));
     }
@@ -222,7 +221,7 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTag(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -247,29 +246,9 @@ public class TagsController : ControllerBase
         _db.Tags.Remove(tag);
         await _db.SaveChangesAsync();
 
-        await LogAudit(AuditAction.TagDeleted, currentUserId, nameof(Tag), id, $"Tag '{tagName}' deleted");
+        await _db.AddAuditLogAsync(AuditAction.TagDeleted, currentUserId, nameof(Tag), id, $"Tag '{tagName}' deleted");
 
         return NoContent();
     }
 
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
-
-    private async Task LogAudit(AuditAction action, int userId, string? entityType, int? entityId, string? details)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = entityType,
-            EntityId = entityId,
-            Details = details,
-            UserId = userId,
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
-    }
 }

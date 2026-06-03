@@ -84,7 +84,7 @@ public class AuditController : ControllerBase
         if (userId == null)
             return this.UnauthorizedProblem();
 
-        var hasAuditRead = HasPermission(PermissionConstants.AuditRead);
+        var hasAuditRead = User.HasPermission(PermissionConstants.AuditRead);
 
         var result = await _auditService.GetAuditLogByIdAsync(id, userId.Value, hasAuditRead);
 
@@ -208,8 +208,4 @@ public class AuditController : ControllerBase
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 
-    private bool HasPermission(string permission)
-    {
-        return User.Claims.Any(c => c.Type == PermissionConstants.ClaimType && c.Value == permission);
-    }
 }
