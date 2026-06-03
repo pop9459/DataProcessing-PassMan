@@ -28,11 +28,6 @@ namespace PassManAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateInvitation([FromBody] CreateInvitationRequest request)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
             if (!TryGetCurrentUserId(out var userId))
             {
                 return this.UnauthorizedProblem();
@@ -45,7 +40,7 @@ namespace PassManAPI.Controllers
 
             if (vault == null)
             {
-                return NotFound("Vault not found.");
+                return this.NotFoundProblem("Vault not found.");
             }
 
             // Check if user is owner or has Admin access
@@ -54,13 +49,13 @@ namespace PassManAPI.Controllers
 
             if (!isOwner && !isAdmin)
             {
-                return Forbid();
+                return this.ForbiddenProblem("You do not have permission to manage invitations for this vault.");
             }
 
             // Parse role
             if (!Enum.TryParse<AccessRole>(request.Role, true, out var role))
             {
-                return BadRequest("Invalid role.");
+                return this.BadRequestProblem("Invalid role.");
             }
 
             // Remove existing pending invitations for this email/vault
@@ -140,12 +135,12 @@ namespace PassManAPI.Controllers
 
             if (invitation == null)
             {
-                return NotFound("Invitation not found.");
+                return this.NotFoundProblem("Invitation not found.");
             }
 
             if (invitation.InvitedEmail.ToLower() != user!.Email!.ToLower())
             {
-                return BadRequest("This invitation is for a different email address.");
+                return this.BadRequestProblem("This invitation is for a different email address.");
             }
 
             try
@@ -154,7 +149,7 @@ namespace PassManAPI.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return this.BadRequestProblem(ex.Message);
             }
 
             // Create VaultShare
@@ -204,7 +199,7 @@ namespace PassManAPI.Controllers
 
             if (invitation == null)
             {
-                return NotFound();
+                return this.NotFoundProblem("Invitation not found.");
             }
 
             // Check if requester is vault owner
@@ -215,7 +210,7 @@ namespace PassManAPI.Controllers
                  var user = await _userManager.FindByIdAsync(userId.ToString());
                  if (user!.Email!.ToLower() != invitation.InvitedEmail.ToLower())
                  {
-                     return Forbid();
+                     return this.ForbiddenProblem("You do not have permission to revoke this invitation.");
                  }
             }
 

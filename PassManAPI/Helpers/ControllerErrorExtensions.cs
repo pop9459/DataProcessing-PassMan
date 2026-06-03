@@ -36,4 +36,7 @@ public static class ControllerErrorExtensions
 
     public static ObjectResult ConflictProblem(this ControllerBase controller, string detail) =>
         controller.Error(ErrorResponse.Conflict(detail, TraceId(controller)));
+
+    public static ObjectResult LockedProblem(this ControllerBase controller, string detail) =>
+        controller.Error(ErrorResponse.Locked(detail, TraceId(controller)));
 }

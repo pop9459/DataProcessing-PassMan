@@ -137,6 +137,21 @@ public class ErrorResponse
     }
 
     /// <summary>
+    /// Creates a Locked (423) error response (e.g. account lockout).
+    /// </summary>
+    public static ErrorResponse Locked(string detail, string? traceId = null)
+    {
+        return new ErrorResponse
+        {
+            Type = "https://tools.ietf.org/html/rfc4918#section-11.3",
+            Title = "Locked",
+            Status = 423,
+            Detail = detail,
+            TraceId = traceId
+        };
+    }
+
+    /// <summary>
     /// Creates an Internal Server Error (500) response.
     /// </summary>
     public static ErrorResponse InternalServerError(string? detail = null, string? traceId = null)
