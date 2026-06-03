@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -61,13 +60,13 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserProfileResponse>> GetUser(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
 
         // Users can view their own profile, or admins can view any profile
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
             return this.ForbiddenProblem();
         }
@@ -97,13 +96,13 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserProfileResponse>> UpdateUser(int id, [FromBody] UpdateProfileRequest request)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
 
         // Users can update their own profile, or admins can update any profile
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
             return this.ForbiddenProblem();
         }
@@ -125,7 +124,7 @@ public class UserController : ControllerBase
             return this.BadRequestProblem(result.Error ?? "Update failed.");
         }
 
-        await LogAuditAsync(AuditAction.UserPasswordChanged, currentUserId, id, "Profile updated");
+        await _db.AddAuditLogAsync(AuditAction.UserPasswordChanged, currentUserId, "User", id, "Profile updated");
         return Ok(ToProfile(result.Data));
     }
 
@@ -142,13 +141,13 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
 
         // Users can delete their own account, or admins can delete any account
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
             return this.ForbiddenProblem();
         }
@@ -175,13 +174,13 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<VaultSummaryDto>>> GetUserVaults(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
 
         // Users can view their own vaults, or admins can view any user's vaults
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
             return this.ForbiddenProblem();
         }
@@ -214,13 +213,13 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<TagDto>>> GetUserTags(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
 
         // Users can view their own tags, or admins can view any user's tags
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
             return this.ForbiddenProblem();
         }
@@ -238,33 +237,6 @@ public class UserController : ControllerBase
             .ToListAsync();
 
         return Ok(tags);
-    }
-
-    // Helper methods
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
-
-    private bool HasPermission(string permission)
-    {
-        return User.Claims.Any(c => c.Type == PermissionConstants.ClaimType && c.Value == permission);
-    }
-
-    private async Task LogAuditAsync(AuditAction action, int actorUserId, int targetUserId, string? details = null)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = "User",
-            EntityId = targetUserId,
-            UserId = actorUserId,
-            Details = details ?? $"User {actorUserId} performed {action} on user {targetUserId}",
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
     }
 
     private static UserProfileResponse ToProfile(User user) =>

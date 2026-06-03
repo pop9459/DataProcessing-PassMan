@@ -137,7 +137,7 @@ public class AuthController : ControllerBase
 
         if (signInResult.IsLockedOut)
         {
-            return StatusCode(StatusCodes.Status423Locked, "Account is locked. Try again later.");
+            return this.LockedProblem("Account is locked. Try again later.");
         }
 
         if (!signInResult.Succeeded)
@@ -218,12 +218,11 @@ public class AuthController : ControllerBase
         }
         catch (InvalidJwtException)
         {
-             // Do not leak the underlying exception detail to the client.
-             return this.UnauthorizedProblem("Invalid Google token.");
+            return this.BadRequestProblem("Invalid Google token.");
         }
         catch (Exception)
         {
-             return this.UnauthorizedProblem("Google authentication failed.");
+            return this.BadRequestProblem("Google authentication failed.");
         }
     }
 
@@ -239,7 +238,7 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _userManager.GetUserByIdAsync(userId.Value);
@@ -267,7 +266,7 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         if (!ModelState.IsValid)
@@ -305,7 +304,7 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _userManager.DeleteUserAsync(userId.Value);
@@ -370,13 +369,13 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var identityUser = await _identityUserManager.FindByIdAsync(userId.Value.ToString());
         if (identityUser == null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem("User not found or token invalid.");
         }
 
         var roles = await _identityUserManager.GetRolesAsync(identityUser);

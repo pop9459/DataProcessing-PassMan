@@ -5,7 +5,6 @@ using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Helpers;
 using PassManAPI.Models;
-using System.Security.Claims;
 
 namespace PassManAPI.Controllers;
 
@@ -36,7 +35,7 @@ public class VaultSharesController : ControllerBase
     [Authorize(Policy = PermissionConstants.VaultShare)]
     public async Task<IActionResult> ShareVault(int vaultId, [FromBody] ShareRequest request)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -79,7 +78,7 @@ public class VaultSharesController : ControllerBase
     [Authorize(Policy = PermissionConstants.VaultShare)]
     public async Task<IActionResult> RevokeShare(int vaultId, int userId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -111,10 +110,4 @@ public class VaultSharesController : ControllerBase
         public string UserEmail { get; set; } = string.Empty;
     }
 
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
 }

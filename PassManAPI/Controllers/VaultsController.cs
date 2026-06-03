@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PassManAPI.Data;
@@ -32,7 +31,7 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<VaultResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<VaultResponse>>> GetVaults([FromQuery] int? userId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -60,7 +59,7 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VaultResponse>> GetVault(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -98,7 +97,7 @@ public class VaultsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -120,7 +119,7 @@ public class VaultsController : ControllerBase
             return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
-        await LogAudit(AuditAction.VaultCreated, currentUserId, nameof(Vault), result.Data!.Id, $"Vault '{result.Data.Name}' created");
+        await _db.AddAuditLogAsync(AuditAction.VaultCreated, currentUserId, nameof(Vault), result.Data!.Id, $"Vault '{result.Data.Name}' created");
 
         var response = ToResponse(result.Data);
         return CreatedAtAction(nameof(GetVault), new { id = result.Data.Id }, response);
@@ -146,7 +145,7 @@ public class VaultsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -171,7 +170,7 @@ public class VaultsController : ControllerBase
             return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
-        await LogAudit(AuditAction.VaultUpdated, currentUserId, nameof(Vault), id, $"Vault '{result.Data!.Name}' updated");
+        await _db.AddAuditLogAsync(AuditAction.VaultUpdated, currentUserId, nameof(Vault), id, $"Vault '{result.Data!.Name}' updated");
 
         return Ok(ToResponse(result.Data));
     }
@@ -189,7 +188,7 @@ public class VaultsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVault(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return this.UnauthorizedProblem();
         }
@@ -212,7 +211,7 @@ public class VaultsController : ControllerBase
             return this.BadRequestProblem(result.Error ?? "Request failed.");
         }
 
-        await LogAudit(AuditAction.VaultDeleted, currentUserId, nameof(Vault), id, $"Vault '{vaultName}' deleted (soft delete)");
+        await _db.AddAuditLogAsync(AuditAction.VaultDeleted, currentUserId, nameof(Vault), id, $"Vault '{vaultName}' deleted (soft delete)");
         return NoContent();
     }
 
@@ -286,24 +285,4 @@ public class VaultsController : ControllerBase
         public bool IsOwner { get; set; }
     }
 
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
-
-    private async Task LogAudit(AuditAction action, int userId, string? entityType, int? entityId, string? details)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = entityType,
-            EntityId = entityId,
-            Details = details,
-            UserId = userId,
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
-    }
 }
