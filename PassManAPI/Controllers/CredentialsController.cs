@@ -46,10 +46,10 @@ public class CredentialsController : ControllerBase
             return this.UnauthorizedProblem();
         }
 
-        var canAccess = await CanAccessVault(vaultId, currentUserId);
-        if (!canAccess)
+        var access = await CheckVaultAccessAsync(vaultId, currentUserId);
+        if (access is not null)
         {
-            return this.ForbiddenProblem();
+            return access;
         }
 
         var items = await _db.Credentials
@@ -103,10 +103,10 @@ public class CredentialsController : ControllerBase
             return this.UnauthorizedProblem();
         }
 
-        var canAccess = await CanAccessVault(vaultId, currentUserId);
-        if (!canAccess)
+        var access = await CheckVaultAccessAsync(vaultId, currentUserId);
+        if (access is not null)
         {
-            return this.ForbiddenProblem();
+            return access;
         }
 
         // Generate a per-credential encryption key (32 bytes)
@@ -589,6 +589,22 @@ public class CredentialsController : ControllerBase
 
         var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
         return isShared;
+    }
+
+    /// <summary>
+    /// Returns null when the user may access the vault; otherwise the appropriate error result:
+    /// 404 when the vault does not exist, 403 when it exists but is not accessible. Mirrors
+    /// VaultsController so a missing vault and an unauthorized one are distinguished consistently.
+    /// </summary>
+    private async Task<IActionResult?> CheckVaultAccessAsync(int vaultId, int currentUserId)
+    {
+        if (await CanAccessVault(vaultId, currentUserId))
+        {
+            return null;
+        }
+
+        var vaultExists = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId);
+        return vaultExists ? this.ForbiddenProblem() : this.NotFoundProblem("Vault not found.");
     }
 
     public class CreateCredentialRequest

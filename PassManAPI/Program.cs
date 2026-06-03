@@ -240,6 +240,9 @@ public class Program
         // Global exception handler middleware (must be early in pipeline)
         app.UseGlobalExceptionHandler();
 
+        // Give bodyless 401/403 responses from the auth pipeline a standardized ErrorResponse body.
+        app.UseAuthErrorBody();
+
         using (var scope = app.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
