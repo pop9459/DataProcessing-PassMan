@@ -437,13 +437,18 @@ public class CredentialsController : ControllerBase
             return this.ForbiddenProblem();
         }
 
-        // Validate all tag ids belong to the current user
-        var validTagIds = await _db.Tags
+        // Validate all tag ids belong to the current user.
+        // Load user's tag IDs server-side first, then filter in memory —
+        // EF Core 9 + Pomelo/MySQL cannot translate List<int>.Contains in a WHERE clause
+        // without primitive-collections support enabled.
+        var userTagIds = await _db.Tags
             .AsNoTracking()
-            .Where(t => t.UserId == currentUserId && request.TagIds.Contains(t.Id))
+            .Where(t => t.UserId == currentUserId)
             .Select(t => t.Id)
             .ToListAsync();
 
+        var requestedSet = new HashSet<int>(request.TagIds);
+        var validTagIds = userTagIds.Where(id => requestedSet.Contains(id)).ToList();
         var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
         if (invalidTagIds.Any())
         {
