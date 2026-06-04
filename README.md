@@ -108,6 +108,8 @@ Remove-Item -Recurse -Force bin, obj
 - **Google OAuth**: Social login integration
 - **Session Management**: Secure token storage and validation
 
+📖 See **[docs/JWT.md](docs/JWT.md)** — where tokens are issued, the claims they carry, how to use the Swagger **Authorize** button, and configuration.
+
 ### Role-Based Permissions
 The API seeds role-based permissions into MySQL on startup (see [`PassManAPI/Data/DbSeeder.cs`](PassManAPI/Data/DbSeeder.cs)):
 
