@@ -3,6 +3,21 @@ using System.ComponentModel.DataAnnotations;
 namespace PassManAPI.DTOs;
 
 /// <summary>
+/// Lightweight credential response used in list endpoints (no notes/category/vaultId).
+/// </summary>
+public class CredentialListItemDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Username { get; set; }
+    public string? Url { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? LastAccessed { get; set; }
+    public List<TagDto> Tags { get; set; } = new();
+}
+
+/// <summary>
 /// Response DTO for Credential information.
 /// Note: Does not include the encrypted password for security reasons.
 /// </summary>

@@ -33,3 +33,28 @@ public record RoleAssignmentResponse
     public int UserId { get; init; }
     public string Role { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Generic single-message response.
+/// </summary>
+public class MessageResponse
+{
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response returned when an invitation is accepted.
+/// </summary>
+public class AcceptInvitationResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public int VaultId { get; set; }
+}
+
+/// <summary>
+/// Response containing a decrypted credential password.
+/// </summary>
+public class PasswordResponse
+{
+    public string Password { get; set; } = string.Empty;
+}

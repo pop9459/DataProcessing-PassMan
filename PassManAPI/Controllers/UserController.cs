@@ -271,4 +271,16 @@ public class UserController : ControllerBase
 /// <summary>
 /// Summary DTO for vault information in user context.
 /// </summary>
-public record VaultSummaryDto(int Id, string Name, string? Description, DateTime CreatedAt);
+public class VaultSummaryDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public VaultSummaryDto() { }
+    public VaultSummaryDto(int id, string name, string? description, DateTime createdAt)
+    {
+        Id = id; Name = name; Description = description; CreatedAt = createdAt;
+    }
+}
