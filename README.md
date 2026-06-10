@@ -266,6 +266,7 @@ dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
 - **[BACKUP_RECOVERY.md](/BACKUP_RECOVERY.md)** - Database backup procedures
 - **[ProjectSummary.md](/ProjectSummary.md)** - Feature breakdown and roadmap
 - **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
+- **[docs/DATABASE.md](docs/DATABASE.md)** - Dedicated least-privilege DB account & provisioning
 - **Swagger UI**: http://localhost:5246/swagger
 
 ## 🎯 Current Features
