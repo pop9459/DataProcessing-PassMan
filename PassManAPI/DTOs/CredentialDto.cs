@@ -84,3 +84,28 @@ public record DecryptedPasswordDto
     public int CredentialId { get; init; }
     public string DecryptedPassword { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Response DTO for listing credentials in a vault (metadata only, no password).
+/// A class so it serializes as both JSON and XML (replaces the previous anonymous projection).
+/// </summary>
+public class CredentialListItemDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Username { get; set; }
+    public string? Url { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? LastAccessed { get; set; }
+    public List<TagDto> Tags { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO carrying a credential's decrypted password (kept as a single <c>password</c> field
+/// for backward compatibility, now XML-serializable).
+/// </summary>
+public class PasswordResponse
+{
+    public string Password { get; set; } = string.Empty;
+}

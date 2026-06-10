@@ -99,7 +99,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -158,7 +158,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -237,7 +237,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize

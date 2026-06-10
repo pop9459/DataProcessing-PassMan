@@ -33,3 +33,20 @@ public record RoleAssignmentResponse
     public int UserId { get; init; }
     public string Role { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Generic message response (replaces anonymous <c>{ message }</c> bodies so they serialize as XML too).
+/// </summary>
+public class MessageResponse
+{
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response for accepting an invitation.
+/// </summary>
+public class InvitationAcceptedResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public int VaultId { get; set; }
+}

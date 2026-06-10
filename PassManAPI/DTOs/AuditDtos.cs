@@ -65,7 +65,8 @@ public class AuditLogFilter
 /// </summary>
 public class PaginatedAuditResult
 {
-    public IEnumerable<AuditLogDto> Items { get; set; } = new List<AuditLogDto>();
+    // List (not IEnumerable): XmlSerializer can't serialize an interface-typed member.
+    public List<AuditLogDto> Items { get; set; } = new();
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }

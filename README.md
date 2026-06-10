@@ -266,6 +266,7 @@ dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
 - **[BACKUP_RECOVERY.md](/BACKUP_RECOVERY.md)** - Database backup procedures
 - **[ProjectSummary.md](/ProjectSummary.md)** - Feature breakdown and roadmap
 - **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
+- **[docs/XML.md](docs/XML.md)** - How to send and receive XML (every endpoint supports JSON and XML)
 - **Swagger UI**: http://localhost:5246/swagger
 
 ## 🎯 Current Features

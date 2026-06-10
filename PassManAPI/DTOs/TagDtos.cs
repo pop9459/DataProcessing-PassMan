@@ -4,11 +4,22 @@ namespace PassManAPI.DTOs;
 
 /// <summary>
 /// Response DTO for Tag information.
+/// A class (not a positional record) with a parameterless constructor so it is XML-serializable
+/// by XmlSerializer; the (id, name) constructor keeps existing call sites and EF projections working.
 /// </summary>
-public record TagDto(
-    int Id,
-    string Name
-);
+public class TagDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+
+    public TagDto() { }
+
+    public TagDto(int id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
+}
 
 /// <summary>
 /// Request DTO for creating a new tag.
