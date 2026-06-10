@@ -201,31 +201,46 @@ public class SharingManager : ISharingManager
             return SharingResult<VaultShareInfo>.Fail("You already own this vault.");
         }
 
-        // Create or update share
-        var existingShare = await _db.VaultShares
-            .FirstOrDefaultAsync(vs => vs.VaultId == invitation.VaultId && vs.UserId == userId);
+        // Wrap the database write in an explicit transaction.
+        // This guarantees that creating/updating the VaultShare and any downstream work
+        // either all succeed together or are fully rolled back — no half-applied state.
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            // Create or update share
+            var existingShare = await _db.VaultShares
+                .FirstOrDefaultAsync(vs => vs.VaultId == invitation.VaultId && vs.UserId == userId);
 
-        if (existingShare != null)
-        {
-            existingShare.Permission = invitation.Permission;
-            existingShare.SharedByUserId = invitation.CreatedByUserId;
-        }
-        else
-        {
-            var share = new VaultShare
+            if (existingShare != null)
             {
-                VaultId = invitation.VaultId,
-                UserId = userId,
-                Permission = invitation.Permission,
-                SharedAt = DateTime.UtcNow,
-                SharedByUserId = invitation.CreatedByUserId
-            };
-            _db.VaultShares.Add(share);
+                existingShare.Permission = invitation.Permission;
+                existingShare.SharedByUserId = invitation.CreatedByUserId;
+            }
+            else
+            {
+                var share = new VaultShare
+                {
+                    VaultId = invitation.VaultId,
+                    UserId = userId,
+                    Permission = invitation.Permission,
+                    SharedAt = DateTime.UtcNow,
+                    SharedByUserId = invitation.CreatedByUserId
+                };
+                _db.VaultShares.Add(share);
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Transaction rolled back while accepting invitation for VaultId={VaultId}, UserId={UserId}",
+                invitation.VaultId, userId);
+            return SharingResult<VaultShareInfo>.Fail("Failed to accept invitation due to a database error.");
         }
 
-        await _db.SaveChangesAsync();
-
-        // Remove used invitation
+        // Only remove the in-memory invitation after the DB transaction has committed successfully.
         _invitations.Remove(token);
 
         _logger.LogInformation("Invitation accepted: VaultId={VaultId}, UserId={UserId}", invitation.VaultId, userId);

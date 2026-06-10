@@ -55,7 +55,8 @@ BEGIN
     IF vOwnerId IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vault not found';
     END IF;
-    SELECT Id INTO vUserId FROM Users WHERE Email = pUserEmail;
+    -- ASP.NET Identity stores users in AspNetUsers, not a plain Users table
+    SELECT Id INTO vUserId FROM AspNetUsers WHERE Email = pUserEmail;
     IF vUserId IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User not found';
     END IF;

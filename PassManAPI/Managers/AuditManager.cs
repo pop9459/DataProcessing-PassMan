@@ -32,33 +32,60 @@ public class AuditManager : IAuditService
     {
         try
         {
-            var auditLog = new AuditLog
-            {
-                UserId = userId,
-                Action = action,
-                IpAddress = ipAddress,
-                UserAgent = userAgent,
-                VaultId = vaultId,
-                CredentialId = credentialId,
-                EntityType = entityType,
-                EntityId = entityId,
-                Details = details,
-                Timestamp = DateTime.UtcNow
-            };
+            AuditLog auditLog;
 
-            _context.AuditLogs.Add(auditLog);
-            await _context.SaveChangesAsync();
+            if (_context.Database.IsMySql())
+            {
+                // On MySQL: delegate the insert to the sp_LogAudit stored procedure.
+                // The procedure writes directly to AuditLogs, bypassing EF change tracking,
+                // which keeps audit writes lightweight and independent of the main DbContext state.
+                await _context.Database.ExecuteSqlRawAsync(
+                    "CALL sp_LogAudit({0}, {1}, {2}, {3}, {4}, {5}, {6})",
+                    userId,
+                    (int)action,
+                    entityType ?? (object)DBNull.Value,
+                    entityId   ?? (object)DBNull.Value,
+                    details    ?? (object)DBNull.Value,
+                    ipAddress  ?? (object)DBNull.Value,
+                    userAgent  ?? (object)DBNull.Value);
+
+                // Retrieve the just-inserted log so we can return a full DTO with navigation properties.
+                auditLog = await _context.AuditLogs
+                    .OrderByDescending(a => a.Id)
+                    .Include(a => a.User)
+                    .Include(a => a.Vault)
+                    .Include(a => a.Credential)
+                    .FirstAsync(a => a.UserId == userId && a.Action == action);
+            }
+            else
+            {
+                // Fallback for SQLite (used in tests): use EF directly.
+                auditLog = new AuditLog
+                {
+                    UserId       = userId,
+                    Action       = action,
+                    IpAddress    = ipAddress,
+                    UserAgent    = userAgent,
+                    VaultId      = vaultId,
+                    CredentialId = credentialId,
+                    EntityType   = entityType,
+                    EntityId     = entityId,
+                    Details      = details,
+                    Timestamp    = DateTime.UtcNow
+                };
+                _context.AuditLogs.Add(auditLog);
+                await _context.SaveChangesAsync();
+
+                await _context.Entry(auditLog).Reference(a => a.User).LoadAsync();
+                if (vaultId.HasValue)
+                    await _context.Entry(auditLog).Reference(a => a.Vault).LoadAsync();
+                if (credentialId.HasValue)
+                    await _context.Entry(auditLog).Reference(a => a.Credential).LoadAsync();
+            }
 
             _logger.LogInformation(
                 "Audit log created: {Action} by user {UserId}, VaultId: {VaultId}, CredentialId: {CredentialId}",
                 action, userId, vaultId, credentialId);
-
-            // Reload with navigation properties
-            await _context.Entry(auditLog).Reference(a => a.User).LoadAsync();
-            if (vaultId.HasValue)
-                await _context.Entry(auditLog).Reference(a => a.Vault).LoadAsync();
-            if (credentialId.HasValue)
-                await _context.Entry(auditLog).Reference(a => a.Credential).LoadAsync();
 
             return AuditOperationResult<AuditLogDto>.Ok(MapToDto(auditLog));
         }
@@ -129,9 +156,19 @@ public class AuditManager : IAuditService
             if (vault == null)
                 return AuditOperationResult<PaginatedAuditResult>.Fail("Vault not found");
 
-            // Check ownership or share access
-            var hasAccess = vault.UserId == requestingUserId ||
-                await _context.VaultShares.AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == requestingUserId);
+            // Check access: on MySQL use the vwUserVaultAccess view (unions owner + shared rows).
+            // Fall back to a direct VaultShares query on SQLite (used in tests) where the view does not exist.
+            bool hasAccess;
+            if (_context.Database.IsMySql())
+            {
+                hasAccess = await _context.VaultAccess
+                    .AnyAsync(va => va.VaultId == vaultId && va.AccessUserId == requestingUserId);
+            }
+            else
+            {
+                hasAccess = vault.UserId == requestingUserId ||
+                    await _context.VaultShares.AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == requestingUserId);
+            }
 
             if (!hasAccess)
                 return AuditOperationResult<PaginatedAuditResult>.Fail("Access denied to vault audit logs");
