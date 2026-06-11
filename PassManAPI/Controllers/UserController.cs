@@ -43,7 +43,8 @@ public class UserController : ControllerBase
             .OrderBy(u => u.Email)
             .ToListAsync();
 
-        var response = users.Select(ToProfile);
+        // Materialize to a List so XmlSerializer can serialize it (it can't serialize a lazy IEnumerable).
+        var response = users.Select(ToProfile).ToList();
         return Ok(response);
     }
 
@@ -269,7 +270,8 @@ public class UserController : ControllerBase
 }
 
 /// <summary>
-/// Summary DTO for vault information in user context.
+/// Summary DTO for vault information in user context. A class with a parameterless constructor so
+/// it is XML-serializable; the positional constructor keeps the EF projection working.
 /// </summary>
 public class VaultSummaryDto
 {
@@ -279,8 +281,12 @@ public class VaultSummaryDto
     public DateTime CreatedAt { get; set; }
 
     public VaultSummaryDto() { }
+
     public VaultSummaryDto(int id, string name, string? description, DateTime createdAt)
     {
-        Id = id; Name = name; Description = description; CreatedAt = createdAt;
+        Id = id;
+        Name = name;
+        Description = description;
+        CreatedAt = createdAt;
     }
 }

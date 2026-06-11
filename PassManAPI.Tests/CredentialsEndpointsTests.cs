@@ -201,6 +201,87 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
     }
 
     [Fact]
+    public async Task Owner_Can_Get_Credential_By_Id()
+    {
+        var user = await RegisterAsync("cred-getbyid@test.local");
+
+        var vaultReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "GetById Vault", userId = user.User.Id })
+        };
+        vaultReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultResp = await _client.SendAsync(vaultReq);
+        vaultResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vault = await vaultResp.Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        var credReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/credentials")
+        {
+            Content = JsonContent.Create(new
+            {
+                Title = "GetById Cred",
+                Username = "gbuser",
+                EncryptedPassword = "secret123",
+                Url = "https://example.com",
+                Notes = "some notes"
+            })
+        };
+        credReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credResp = await _client.SendAsync(credReq);
+        credResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await credResp.Content.ReadFromJsonAsync<IdResponse>();
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created!.Id}");
+        getReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await getResp.Content.ReadFromJsonAsync<CredentialDetail>();
+        detail.Should().NotBeNull();
+        detail!.Id.Should().Be(created.Id);
+        detail.Title.Should().Be("GetById Cred");
+        detail.Username.Should().Be("gbuser");
+        detail.Notes.Should().Be("some notes");
+        detail.VaultId.Should().Be(vault.Id);
+    }
+
+    [Fact]
+    public async Task GetCredentialById_Returns_404_For_Missing_Credential()
+    {
+        var user = await RegisterAsync("cred-getbyid-404@test.local");
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, "/api/credentials/999999");
+        getReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetCredentialById_Returns_403_For_Other_Users_Credential()
+    {
+        var owner = await RegisterAsync("cred-getbyid-owner@test.local");
+        var other = await RegisterAsync("cred-getbyid-other@test.local");
+
+        var vaultReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "Private Vault", userId = owner.User.Id })
+        };
+        vaultReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var vault = await (await _client.SendAsync(vaultReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        var credReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/credentials")
+        {
+            Content = JsonContent.Create(new { Title = "Private Cred", EncryptedPassword = "secret" })
+        };
+        credReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var created = await (await _client.SendAsync(credReq)).Content.ReadFromJsonAsync<IdResponse>();
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created!.Id}");
+        getReq.Headers.Add("X-UserId", other.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Owner_Can_Retrieve_Decrypted_Password()
     {
         var user = await RegisterAsync("cred-password-get@test.local");
@@ -342,6 +423,20 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
     }
 
     private record CreatedVaultResponse(int Id);
+
+    private record CredentialDetail(
+        int Id,
+        string Title,
+        string? Username,
+        string? Url,
+        string? Notes,
+        int? CategoryId,
+        string? CategoryName,
+        int VaultId,
+        DateTime CreatedAt,
+        DateTime? UpdatedAt,
+        DateTime? LastAccessed
+    );
 
     private record CredentialListItem(
         int Id,

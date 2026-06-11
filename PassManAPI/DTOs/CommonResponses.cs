@@ -35,7 +35,7 @@ public record RoleAssignmentResponse
 }
 
 /// <summary>
-/// Generic single-message response.
+/// Generic message response (replaces anonymous <c>{ message }</c> bodies so they serialize as XML too).
 /// </summary>
 public class MessageResponse
 {
@@ -43,16 +43,17 @@ public class MessageResponse
 }
 
 /// <summary>
-/// Response returned when an invitation is accepted.
+/// Response for accepting an invitation.
 /// </summary>
-public class AcceptInvitationResponse
+public class InvitationAcceptedResponse
 {
     public string Message { get; set; } = string.Empty;
     public int VaultId { get; set; }
 }
 
 /// <summary>
-/// Response containing a decrypted credential password.
+/// Response carrying a credential's decrypted password (kept as a single <c>password</c> field
+/// for backward compatibility, now XML-serializable).
 /// </summary>
 public class PasswordResponse
 {

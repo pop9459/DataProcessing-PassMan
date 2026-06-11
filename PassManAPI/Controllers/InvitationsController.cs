@@ -119,7 +119,7 @@ namespace PassManAPI.Controllers
                 Status = "Pending",
                 ExpiresAt = i.ExpiresAt,
                 InviteToken = i.InviteToken
-            }));
+            }).ToList());
         }
 
         // POST: api/invitations/{token}/accept
@@ -188,7 +188,7 @@ namespace PassManAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new AcceptInvitationResponse { Message = "Invitation accepted.", VaultId = invitation.VaultId });
+            return Ok(new InvitationAcceptedResponse { Message = "Invitation accepted.", VaultId = invitation.VaultId });
         }
 
         // DELETE: api/invitations/{id}
