@@ -412,6 +412,8 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetCredentialTags(int id, [FromBody] AssignTagsRequest request)
     {
+        request.TagIds ??= new();
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -437,14 +439,16 @@ public class CredentialsController : ControllerBase
             return this.ForbiddenProblem();
         }
 
-        // Validate all tag ids belong to the current user
-        var validTagIds = await _db.Tags
+        // Validate all tag ids belong to the current user.
+        // Pomelo MySQL EF Core 9 preview does not support primitive-collection Contains in LINQ-to-SQL,
+        // so fetch all of the user's tag IDs first and validate in memory.
+        var userTagIds = await _db.Tags
             .AsNoTracking()
-            .Where(t => t.UserId == currentUserId && request.TagIds.Contains(t.Id))
+            .Where(t => t.UserId == currentUserId)
             .Select(t => t.Id)
             .ToListAsync();
 
-        var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
+        var invalidTagIds = request.TagIds.Except(userTagIds).ToList();
         if (invalidTagIds.Any())
         {
             return this.BadRequestProblem($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
