@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace PassManAPI.DTOs;
 
@@ -39,6 +40,6 @@ public class UpdateTagRequest
 /// </summary>
 public class AssignTagsRequest
 {
-    [Required]
+    [ValidateNever]
     public List<int> TagIds { get; set; } = new();
 }
