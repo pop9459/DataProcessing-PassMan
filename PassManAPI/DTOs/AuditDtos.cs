@@ -69,7 +69,8 @@ public class PaginatedAuditResult
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
-    public bool HasNextPage => Page < TotalPages;
-    public bool HasPreviousPage => Page > 1;
+    // Computed fields; setters are stubs required by XmlSerializer (getter-only properties are skipped).
+    public int TotalPages { get => (int)Math.Ceiling((double)TotalCount / PageSize); set { } }
+    public bool HasNextPage { get => Page < TotalPages; set { } }
+    public bool HasPreviousPage { get => Page > 1; set { } }
 }

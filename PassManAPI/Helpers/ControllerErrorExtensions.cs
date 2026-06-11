@@ -14,12 +14,14 @@ public static class ControllerErrorExtensions
     private static string TraceId(ControllerBase controller) =>
         Activity.Current?.Id ?? controller.HttpContext.TraceIdentifier;
 
-    /// <summary>Returns the given <see cref="ErrorResponse"/> with its status code and problem+json content type.</summary>
+    /// <summary>
+    /// Returns the given <see cref="ErrorResponse"/> with its status code. No explicit content type is
+    /// set, so MVC content-negotiates the body as JSON or XML based on the request's Accept header.
+    /// </summary>
     public static ObjectResult Error(this ControllerBase controller, ErrorResponse error) =>
         new(error)
         {
-            StatusCode = error.Status,
-            ContentTypes = { "application/problem+json" }
+            StatusCode = error.Status
         };
 
     public static ObjectResult BadRequestProblem(this ControllerBase controller, string detail) =>

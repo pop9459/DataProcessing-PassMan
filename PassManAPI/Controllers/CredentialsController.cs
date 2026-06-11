@@ -57,15 +57,15 @@ public class CredentialsController : ControllerBase
             .Where(c => c.VaultId == vaultId)
             .Include(c => c.CredentialTags)
                 .ThenInclude(ct => ct.Tag)
-            .Select(c => new
+            .Select(c => new CredentialListItemDto
             {
-                c.Id,
-                c.Title,
-                c.Username,
-                c.Url,
-                c.CreatedAt,
-                c.UpdatedAt,
-                c.LastAccessed,
+                Id = c.Id,
+                Title = c.Title,
+                Username = c.Username,
+                Url = c.Url,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                LastAccessed = c.LastAccessed,
                 Tags = c.CredentialTags.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList()
             })
             .ToListAsync();
@@ -136,7 +136,7 @@ public class CredentialsController : ControllerBase
         _db.Credentials.Add(credential);
         await _db.SaveChangesAsync();
 
-        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new IdResponse { Id = credential.Id });
     }
 
     /// <summary>
@@ -188,7 +188,7 @@ public class CredentialsController : ControllerBase
         if (parts.Length != 2)
         {
             // Handle legacy format (unencrypted)
-            return Ok(new { password = credential.EncryptedPassword });
+            return Ok(new PasswordResponse { Password = credential.EncryptedPassword });
         }
 
         var perCredentialKeyBase64 = parts[0];
@@ -200,7 +200,7 @@ public class CredentialsController : ControllerBase
         // Decrypt the password
         var decryptedPassword = _encryptionService.DecryptPassword(encryptedPasswordBytes, perCredentialKey);
 
-        return Ok(new { password = decryptedPassword });
+        return Ok(new PasswordResponse { Password = decryptedPassword });
     }
 
     /// <summary>
@@ -412,6 +412,8 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetCredentialTags(int id, [FromBody] AssignTagsRequest request)
     {
+        request.TagIds ??= new();
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -437,14 +439,16 @@ public class CredentialsController : ControllerBase
             return this.ForbiddenProblem();
         }
 
-        // Validate all tag ids belong to the current user
-        var validTagIds = await _db.Tags
+        // Validate all tag ids belong to the current user.
+        // Pomelo MySQL EF Core 9 preview does not support primitive-collection Contains in LINQ-to-SQL,
+        // so fetch all of the user's tag IDs first and validate in memory.
+        var userTagIds = await _db.Tags
             .AsNoTracking()
-            .Where(t => t.UserId == currentUserId && request.TagIds.Contains(t.Id))
+            .Where(t => t.UserId == currentUserId)
             .Select(t => t.Id)
             .ToListAsync();
 
-        var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
+        var invalidTagIds = request.TagIds.Except(userTagIds).ToList();
         if (invalidTagIds.Any())
         {
             return this.BadRequestProblem($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
@@ -529,7 +533,7 @@ public class CredentialsController : ControllerBase
         _db.CredentialTags.Add(new CredentialTag(id, tagId));
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Tag added successfully." });
+        return Ok(new MessageResponse { Message = "Tag added successfully." });
     }
 
     /// <summary>

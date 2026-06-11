@@ -203,6 +203,57 @@ public class XmlSerializationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Controller_Error_Should_Serialize_As_XML_When_Accept_Is_XML()
+    {
+        // A controller-returned error (404 "Vault not found." from CredentialsController) must
+        // content-negotiate to XML — previously the helper forced application/problem+json.
+        var user = await RegisterAsync($"xml-err-{Guid.NewGuid()}@test.local");
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/vaults/999999/credentials");
+        request.Headers.Add("X-UserId", user.User.Id.ToString());
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+
+        var xml = XDocument.Parse(await response.Content.ReadAsStringAsync());
+        xml.Root!.Name.LocalName.Should().Be("ErrorResponse");
+        xml.Root.Element("Detail")!.Value.Should().Contain("Vault not found");
+    }
+
+    [Fact]
+    public async Task Middleware_Unauthorized_Should_Serialize_As_XML_When_Accept_Is_XML()
+    {
+        // A 401 produced by the auth pipeline (no controller body) must also be available as XML.
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+
+        var xml = XDocument.Parse(await response.Content.ReadAsStringAsync());
+        xml.Root!.Name.LocalName.Should().Be("ErrorResponse");
+        xml.Root.Element("Status")!.Value.Should().Be("401");
+    }
+
+    [Fact]
+    public async Task Error_Should_Default_To_Json_When_Xml_Not_Requested()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Contain("json");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("\"status\":401");
+    }
+
+    [Fact]
     public async Task JSON_Should_Still_Work_When_XML_Is_Enabled()
     {
         // Arrange

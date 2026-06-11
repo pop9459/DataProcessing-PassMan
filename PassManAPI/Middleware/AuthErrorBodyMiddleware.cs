@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using PassManAPI.DTOs;
 
 namespace PassManAPI.Middleware;
@@ -11,15 +9,10 @@ namespace PassManAPI.Middleware;
 /// Controller-returned 401/403 already carry a body, so those are left untouched. This runs as an
 /// outer wrapper so it can inspect the final status code before the response is flushed — which is
 /// why it works across the JWT + dev-header multi-scheme setup where JwtBearer events did not.
+/// The body is content-negotiated (XML or JSON) via <see cref="ErrorResponseWriter"/>.
 /// </summary>
 public class AuthErrorBodyMiddleware
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private readonly RequestDelegate _next;
 
     public AuthErrorBodyMiddleware(RequestDelegate next)
@@ -50,7 +43,7 @@ public class AuthErrorBodyMiddleware
 
         if (error is not null)
         {
-            await context.Response.WriteAsJsonAsync(error, JsonOptions, "application/problem+json");
+            await ErrorResponseWriter.WriteAsync(context, error);
         }
     }
 }

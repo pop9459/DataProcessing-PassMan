@@ -188,7 +188,7 @@ namespace PassManAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { Message = "Invitation accepted.", VaultId = invitation.VaultId });
+            return Ok(new AcceptInvitationResponse { Message = "Invitation accepted.", VaultId = invitation.VaultId });
         }
 
         // DELETE: api/invitations/{id}

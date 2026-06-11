@@ -428,7 +428,7 @@ public class AuthController : ControllerBase
             return this.BadRequestProblem(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        return Ok(new { Message = $"User assigned to role '{request.RoleName}' successfully." });
+        return Ok(new MessageResponse { Message = $"User assigned to role '{request.RoleName}' successfully." });
     }
 
     /// <summary>
