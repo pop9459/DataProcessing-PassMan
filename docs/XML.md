@@ -88,9 +88,11 @@ back as XML instead of JSON:
 Validation (400) errors include the field errors as a `<errors>` list:
 
 ```xml
-<ErrorResponse>
+<ErrorResponse xmlns:xsi="...">
+  <Type>https://tools.ietf.org/html/rfc7231#section-6.5.1</Type>
   <Title>One or more validation errors occurred.</Title>
   <Status>400</Status>
+  <TraceId>00-...</TraceId>
   <errors>
     <error field="Email"><message>The Email field is required.</message></error>
   </errors>
@@ -106,3 +108,5 @@ Validation (400) errors include the field errors as a `<errors>` list:
   interface-typed members (e.g. `IEnumerable<T>`), so list endpoints return concrete `List<T>`.
 - Pipeline errors (the global exception handler and the 401/403 auth-pipeline responses) are written
   by `ErrorResponseWriter`, which negotiates XML/JSON from the `Accept` header outside MVC.
+- The user-management controller maps to **`/api/user`** (singular — follows `[controller]` from
+  `UserController`), not `/api/users`. All other controllers use plurals (`/api/vaults`, `/api/tags`, …).

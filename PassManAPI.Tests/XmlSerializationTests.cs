@@ -342,6 +342,40 @@ public class XmlSerializationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task GetCredentialById_Should_Return_XML_When_Accept_Is_XML()
+    {
+        var user = await RegisterAsync($"credbyid-xml-{Guid.NewGuid()}@test.local");
+
+        var vReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "credbyid-vault", userId = user.User.Id })
+        };
+        vReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultId = (await (await _client.SendAsync(vReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var cReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultId}/credentials")
+        {
+            Content = JsonContent.Create(new { title = "xml-detail-cred", encryptedPassword = "pw", notes = "my notes" })
+        };
+        cReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credId = (await (await _client.SendAsync(cReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{credId}");
+        req.Headers.Add("X-UserId", user.User.Id.ToString());
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var resp = await _client.SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        var body = await resp.Content.ReadAsStringAsync();
+        var xml = XDocument.Parse(body);
+        xml.Root!.Name.LocalName.Should().Be("CredentialDto");
+        xml.Root.Element("Title")!.Value.Should().Be("xml-detail-cred");
+        xml.Root.Element("Notes")!.Value.Should().Be("my notes");
+        xml.Root.Element("VaultId")!.Value.Should().Be(vaultId.ToString());
+    }
+
+    [Fact]
     public async Task AuditLogs_Should_Return_XML_When_Accept_Is_XML()
     {
         // Covers the IEnumerable -> List fix on PaginatedAuditResult.Items.
