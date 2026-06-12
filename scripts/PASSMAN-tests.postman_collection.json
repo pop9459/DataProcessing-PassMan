@@ -4909,7 +4909,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('404 NotFound', function(){ pm.response.to.have.status(404); });"
+                  "pm.test('400 BadRequest', function(){ pm.response.to.have.status(400); });"
                 ],
                 "type": "text/javascript"
               }

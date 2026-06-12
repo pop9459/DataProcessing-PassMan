@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +80,9 @@ public class VaultSharesController : ControllerBase
             }
         }
 
+        await _db.AddAuditLogAsync(AuditAction.VaultShared, currentUserId, nameof(VaultShare), vaultId,
+            $"Vault {vaultId} shared with {targetUser.Email}");
+
         return Ok(new VaultShareResponse { VaultId = vaultId, TargetUser = targetUser.Email! });
     }
 
@@ -90,6 +94,8 @@ public class VaultSharesController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     [HttpGet("/api/vaults/my-access")]
     [Authorize]
+    [ProducesResponseType(typeof(IEnumerable<VaultAccessRow>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMyVaultAccess()
     {
         if (!User.TryGetCurrentUserId(out var currentUserId))
@@ -164,11 +170,17 @@ public class VaultSharesController : ControllerBase
 
         _db.VaultShares.Remove(share);
         await _db.SaveChangesAsync();
+
+        await _db.AddAuditLogAsync(AuditAction.VaultShareRevoked, currentUserId, nameof(VaultShare), vaultId,
+            $"Share revoked for user {userId} on vault {vaultId}");
+
         return NoContent();
     }
 
     public class ShareRequest
     {
+        [Required]
+        [EmailAddress]
         public string UserEmail { get; set; } = string.Empty;
     }
 
