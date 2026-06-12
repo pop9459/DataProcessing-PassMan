@@ -57,15 +57,15 @@ public class CredentialsController : ControllerBase
             .Where(c => c.VaultId == vaultId)
             .Include(c => c.CredentialTags)
                 .ThenInclude(ct => ct.Tag)
-            .Select(c => new
+            .Select(c => new CredentialListItemDto
             {
-                c.Id,
-                c.Title,
-                c.Username,
-                c.Url,
-                c.CreatedAt,
-                c.UpdatedAt,
-                c.LastAccessed,
+                Id = c.Id,
+                Title = c.Title,
+                Username = c.Username,
+                Url = c.Url,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                LastAccessed = c.LastAccessed,
                 Tags = c.CredentialTags.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList()
             })
             .ToListAsync();
@@ -136,7 +136,66 @@ public class CredentialsController : ControllerBase
         _db.Credentials.Add(credential);
         await _db.SaveChangesAsync();
 
-        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new IdResponse { Id = credential.Id });
+    }
+
+    /// <summary>
+    /// Retrieves a single credential by its ID (without the password).
+    /// </summary>
+    /// <param name="id">The unique identifier of the credential.</param>
+    /// <response code="200">Returns the credential detail.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have access to the vault that owns this credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpGet("/api/credentials/{id:int}")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
+    [ProducesResponseType(typeof(CredentialDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id)
+    {
+        if (!User.TryGetCurrentUserId(out var currentUserId))
+        {
+            return this.UnauthorizedProblem();
+        }
+
+        var credential = await _db.Credentials
+            .AsNoTracking()
+            .Include(c => c.Category)
+            .Include(c => c.CredentialTags)
+                .ThenInclude(ct => ct.Tag)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (credential is null)
+        {
+            return this.NotFoundProblem("Credential not found.");
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return this.ForbiddenProblem();
+        }
+
+        var dto = new CredentialDto
+        {
+            Id = credential.Id,
+            Title = credential.Title,
+            Username = credential.Username,
+            Url = credential.Url,
+            Notes = credential.Notes,
+            CategoryId = credential.CategoryId,
+            CategoryName = credential.Category?.Name,
+            VaultId = credential.VaultId,
+            CreatedAt = credential.CreatedAt,
+            UpdatedAt = credential.UpdatedAt,
+            LastAccessed = credential.LastAccessed,
+            Tags = credential.CredentialTags
+                .Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name))
+                .ToList()
+        };
+
+        return Ok(dto);
     }
 
     /// <summary>
@@ -188,7 +247,7 @@ public class CredentialsController : ControllerBase
         if (parts.Length != 2)
         {
             // Handle legacy format (unencrypted)
-            return Ok(new { password = credential.EncryptedPassword });
+            return Ok(new PasswordResponse { Password = credential.EncryptedPassword });
         }
 
         var perCredentialKeyBase64 = parts[0];
@@ -200,7 +259,7 @@ public class CredentialsController : ControllerBase
         // Decrypt the password
         var decryptedPassword = _encryptionService.DecryptPassword(encryptedPasswordBytes, perCredentialKey);
 
-        return Ok(new { password = decryptedPassword });
+        return Ok(new PasswordResponse { Password = decryptedPassword });
     }
 
     /// <summary>
@@ -412,6 +471,8 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetCredentialTags(int id, [FromBody] AssignTagsRequest request)
     {
+        request.TagIds ??= new();
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -437,14 +498,16 @@ public class CredentialsController : ControllerBase
             return this.ForbiddenProblem();
         }
 
-        // Validate all tag ids belong to the current user
-        var validTagIds = await _db.Tags
+        // Validate all tag ids belong to the current user.
+        // Pomelo MySQL EF Core 9 preview does not support primitive-collection Contains in LINQ-to-SQL,
+        // so fetch all of the user's tag IDs first and validate in memory.
+        var userTagIds = await _db.Tags
             .AsNoTracking()
-            .Where(t => t.UserId == currentUserId && request.TagIds.Contains(t.Id))
+            .Where(t => t.UserId == currentUserId)
             .Select(t => t.Id)
             .ToListAsync();
 
-        var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
+        var invalidTagIds = request.TagIds.Except(userTagIds).ToList();
         if (invalidTagIds.Any())
         {
             return this.BadRequestProblem($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
@@ -529,7 +592,7 @@ public class CredentialsController : ControllerBase
         _db.CredentialTags.Add(new CredentialTag(id, tagId));
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Tag added successfully." });
+        return Ok(new MessageResponse { Message = "Tag added successfully." });
     }
 
     /// <summary>

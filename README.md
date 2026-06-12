@@ -177,6 +177,10 @@ PassManGUI/
 
 PassManAPI.Tests/    # Integration tests
 └── *.cs            # 106 passing tests
+
+scripts/             # Test tooling
+├── PASSMAN-tests.postman_collection.json  # Postman smoke tests (full API surface)
+└── tester/          # Python test harness
 ```
 
 ## 📝 API Endpoints
@@ -259,6 +263,23 @@ dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
 - **AttachmentModelTests**: File attachment handling
 - **AuthorizationPolicyTests**: Role-based access control
 
+### Postman smoke tests (end-to-end)
+
+`scripts/PASSMAN-tests.postman_collection.json` covers the full API surface against a live MySQL instance. Import it into Postman or run with Newman:
+
+```bash
+# API must be running in Test environment first
+ASPNETCORE_ENVIRONMENT=Test dotnet run --project PassManAPI
+
+# Then run the collection (Newman)
+npm install -g newman
+newman run scripts/PASSMAN-tests.postman_collection.json \
+  --env-var baseUrl=http://localhost:5248 \
+  --env-var userPassword=Password1!
+```
+
+Set `baseUrl` and `userPassword` in a Postman environment; all other variables (`userId`, `vaultId`, `credentialId`, …) are set automatically by the collection as it runs. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for full details.
+
 ## 📚 Documentation
 
 - **[API_INTEGRATION_SUMMARY.md](/API_INTEGRATION_SUMMARY.md)** - Frontend-backend integration
@@ -267,6 +288,7 @@ dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
 - **[ProjectSummary.md](/ProjectSummary.md)** - Feature breakdown and roadmap
 - **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
 - **[docs/DATABASE.md](docs/DATABASE.md)** - Dedicated least-privilege DB account & provisioning
+- **[docs/XML.md](docs/XML.md)** - How to send and receive XML (every endpoint supports JSON and XML)
 - **Swagger UI**: http://localhost:5246/swagger
 
 ## 🎯 Current Features

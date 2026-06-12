@@ -65,11 +65,13 @@ public class AuditLogFilter
 /// </summary>
 public class PaginatedAuditResult
 {
-    public IEnumerable<AuditLogDto> Items { get; set; } = new List<AuditLogDto>();
+    // List (not IEnumerable): XmlSerializer can't serialize an interface-typed member.
+    public List<AuditLogDto> Items { get; set; } = new();
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
-    public bool HasNextPage => Page < TotalPages;
-    public bool HasPreviousPage => Page > 1;
+    // Computed fields; setters are stubs required by XmlSerializer (getter-only properties are skipped).
+    public int TotalPages { get => (int)Math.Ceiling((double)TotalCount / PageSize); set { } }
+    public bool HasNextPage { get => Page < TotalPages; set { } }
+    public bool HasPreviousPage { get => Page > 1; set { } }
 }
