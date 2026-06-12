@@ -74,13 +74,17 @@ _invitations.Remove(token);
 
 ## Session-Level Isolation
 
-In `DatabaseArtifacts.EnsureAsync` the startup code sets:
+Every MySQL connection used by the API runs at **READ COMMITTED**. This is enforced by `ReadCommittedInterceptor` (`PassManAPI/Helpers/ReadCommittedInterceptor.cs`), a `DbConnectionInterceptor` registered on the MySQL `DbContext` in `Program.cs`. It executes:
 
 ```sql
 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
 ```
 
-This prevents dirty reads (seeing uncommitted rows from other transactions) while keeping write throughput higher than REPEATABLE READ. It is appropriate for a password manager where stale reads are acceptable but reading garbage data is not.
+on every connection as it opens — including pooled connections — so the setting is never lost.
+
+**Why READ COMMITTED?**
+- Prevents dirty reads (seeing another transaction's uncommitted writes), which would be a serious correctness issue for a password manager.
+- Avoids the extra locking overhead of REPEATABLE READ, which would be overkill here: the app does not run long-running reads that need a stable snapshot across multiple queries in the same request.
 
 ---
 

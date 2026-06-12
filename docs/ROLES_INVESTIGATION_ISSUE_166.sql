@@ -567,9 +567,9 @@ SELECT
 --   CHECK: appsettings.json or appsettings.Development.json
 --   FIELD: ConnectionStrings.DefaultConnection
 --   EXAMPLE (Production):
---     "Server=db;Database=passManDB;User=root;Password=hihi;"
+--     "Server=db;Database=passManDB;User=passman_app;Password=${DB_APP_PASSWORD};"
 --   EXAMPLE (Development):
---     "Server=localhost;Port=3306;Database=passManDB;User=root;Password=hihi;Pooling=true"
+--     "Server=localhost;Port=3306;Database=passManDB;User=passman_app;Password=passman_app_dev_pw;Pooling=true"
 
 
 -- Step 4: Force re-seeding (caution: development only)

@@ -40,22 +40,25 @@ public class AuditManager : IAuditService
                 // The procedure writes directly to AuditLogs, bypassing EF change tracking,
                 // which keeps audit writes lightweight and independent of the main DbContext state.
                 await _context.Database.ExecuteSqlRawAsync(
-                    "CALL sp_LogAudit({0}, {1}, {2}, {3}, {4}, {5}, {6})",
+                    "CALL sp_LogAudit({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8})",
                     userId,
                     (int)action,
-                    entityType ?? (object)DBNull.Value,
-                    entityId   ?? (object)DBNull.Value,
-                    details    ?? (object)DBNull.Value,
-                    ipAddress  ?? (object)DBNull.Value,
-                    userAgent  ?? (object)DBNull.Value);
+                    entityType    ?? (object)DBNull.Value,
+                    entityId      ?? (object)DBNull.Value,
+                    details       ?? (object)DBNull.Value,
+                    ipAddress     ?? (object)DBNull.Value,
+                    userAgent     ?? (object)DBNull.Value,
+                    vaultId       ?? (object)DBNull.Value,
+                    credentialId  ?? (object)DBNull.Value);
 
-                // Retrieve the just-inserted log so we can return a full DTO with navigation properties.
+                // LAST_INSERT_ID() is session-scoped so it always returns the row written by
+                // this call, even under concurrent audit writes from other sessions.
                 auditLog = await _context.AuditLogs
-                    .OrderByDescending(a => a.Id)
+                    .FromSqlRaw("SELECT * FROM AuditLogs WHERE Id = LAST_INSERT_ID()")
                     .Include(a => a.User)
                     .Include(a => a.Vault)
                     .Include(a => a.Credential)
-                    .FirstAsync(a => a.UserId == userId && a.Action == action);
+                    .FirstAsync();
             }
             else
             {

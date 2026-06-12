@@ -88,6 +88,7 @@ public class Program
                     builder.Configuration.GetConnectionString("DefaultConnection"),
                     new MySqlServerVersion(new Version(8, 0, 0))
                 )
+                .AddInterceptors(new ReadCommittedInterceptor())
             );
         }
 

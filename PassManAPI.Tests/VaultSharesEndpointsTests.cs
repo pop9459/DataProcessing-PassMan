@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using PassManAPI.DTOs;
+using PassManAPI.Models;
 using Xunit;
 
 namespace PassManAPI.Tests;
@@ -155,6 +156,56 @@ public class VaultSharesEndpointsTests : IClassFixture<TestWebApplicationFactory
         shareReq.Headers.Add("X-UserId", owner.User.Id.ToString());
         var shareResp = await _client.SendAsync(shareReq);
         shareResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task MyAccess_Returns_Owned_And_Shared_Vaults()
+    {
+        var owner = await RegisterAsync("access-owner@test.local");
+        var reader = await RegisterAsync("access-reader@test.local");
+
+        // Owner creates a vault
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "Access Vault", description = "for access test", userId = owner.User.Id })
+        };
+        createReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var createResp = await _client.SendAsync(createReq);
+        createResp.EnsureSuccessStatusCode();
+        var vault = await createResp.Content.ReadFromJsonAsync<VaultResponse>();
+
+        // Owner shares it with reader
+        var shareReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/share")
+        {
+            Content = JsonContent.Create(new { userEmail = reader.User.Email })
+        };
+        shareReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var shareResp2 = await _client.SendAsync(shareReq);
+        shareResp2.StatusCode.Should().Be(HttpStatusCode.OK,
+            $"share failed (vaultId={vault.Id}): {await shareResp2.Content.ReadAsStringAsync()}");
+
+        // Owner sees their vault as "Owner"
+        var ownerReq = new HttpRequestMessage(HttpMethod.Get, "/api/vaults/my-access");
+        ownerReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var ownerResp = await _client.SendAsync(ownerReq);
+        ownerResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var ownerRows = await ownerResp.Content.ReadFromJsonAsync<List<VaultAccessRow>>();
+        ownerRows.Should().Contain(r => r.VaultId == vault.Id && r.AccessType == "Owner");
+
+        // Reader sees the vault as "Shared"
+        var readerReq = new HttpRequestMessage(HttpMethod.Get, "/api/vaults/my-access");
+        readerReq.Headers.Add("X-UserId", reader.User.Id.ToString());
+        var readerResp = await _client.SendAsync(readerReq);
+        readerResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var readerRows = await readerResp.Content.ReadFromJsonAsync<List<VaultAccessRow>>();
+        readerRows.Should().Contain(r => r.VaultId == vault.Id && r.AccessType == "Shared");
+    }
+
+    [Fact]
+    public async Task MyAccess_Unauthenticated_Returns_Unauthorized()
+    {
+        var resp = await _client.GetAsync("/api/vaults/my-access");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     private async Task<AuthResponse> RegisterAsync(string email)

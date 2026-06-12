@@ -92,18 +92,43 @@ public class VaultSharesController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetMyVaultAccess()
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
             return Unauthorized();
         }
 
-        if (!_db.Database.IsMySql())
-            return StatusCode(501, "This endpoint requires MySQL.");
+        IEnumerable<VaultAccessRow> accessible;
 
-        // Query the vwUserVaultAccess view — returns all vaults this user owns or has been shared into.
-        var accessible = await _db.VaultAccess
-            .Where(va => va.AccessUserId == currentUserId)
-            .ToListAsync();
+        if (_db.Database.IsMySql())
+        {
+            // On MySQL: query the vwUserVaultAccess view directly.
+            accessible = await _db.VaultAccess
+                .Where(va => va.AccessUserId == currentUserId)
+                .ToListAsync();
+        }
+        else
+        {
+            // Fallback for SQLite (tests): replicate the view's union logic in LINQ.
+            var owned = await _db.Vaults
+                .Where(v => v.UserId == currentUserId)
+                .Select(v => new VaultAccessRow
+                {
+                    VaultId = v.Id, VaultName = v.Name,
+                    OwnerId = v.UserId, AccessUserId = v.UserId,
+                    AccessType = "Owner"
+                }).ToListAsync();
+
+            var shared = await _db.VaultShares
+                .Where(vs => vs.UserId == currentUserId)
+                .Select(vs => new VaultAccessRow
+                {
+                    VaultId = vs.VaultId, VaultName = vs.Vault.Name,
+                    OwnerId = vs.Vault.UserId, AccessUserId = vs.UserId,
+                    AccessType = "Shared"
+                }).ToListAsync();
+
+            accessible = owned.Concat(shared);
+        }
 
         return Ok(accessible);
     }

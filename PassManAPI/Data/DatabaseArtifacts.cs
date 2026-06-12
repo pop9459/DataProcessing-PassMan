@@ -77,10 +77,12 @@ CREATE PROCEDURE sp_LogAudit(
     IN pEntityId INT,
     IN pDetails TEXT,
     IN pIp VARCHAR(45),
-    IN pUserAgent VARCHAR(500))
+    IN pUserAgent VARCHAR(500),
+    IN pVaultId INT,
+    IN pCredentialId INT)
 BEGIN
-    INSERT INTO AuditLogs (Action, EntityType, EntityId, Details, UserId, IpAddress, UserAgent, Timestamp)
-    VALUES (pAction, pEntityType, pEntityId, pDetails, pUserId, pIp, pUserAgent, CURRENT_TIMESTAMP);
+    INSERT INTO AuditLogs (Action, EntityType, EntityId, Details, UserId, IpAddress, UserAgent, Timestamp, VaultId, CredentialId)
+    VALUES (pAction, pEntityType, pEntityId, pDetails, pUserId, pIp, pUserAgent, CURRENT_TIMESTAMP, pVaultId, pCredentialId);
 END;";
             await ExecuteAsync(conn, tx, dropSpAudit);
             await ExecuteAsync(conn, tx, createSpAudit);

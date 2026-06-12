@@ -68,7 +68,7 @@ The seeder is **idempotent** — running it multiple times does not create dupli
 | owner | owner@passman.test | Owner123! | VaultOwner |
 | reader | reader@passman.test | Reader123! | VaultReader |
 
-Demo user seeding is **disabled by default**. Enable it in `Program.cs` by passing `seedDemoUsers: true` to `DbSeeder.SeedAsync`.
+Demo user seeding is **enabled automatically in Development** — `Program.cs` passes `seedDemoUsers: app.Environment.IsDevelopment()` to `DbSeeder.SeedAsync`, so these users are created on first startup in a dev environment and skipped in staging/production.
 
 ---
 
