@@ -22,6 +22,12 @@ namespace PassManAPI.Data
         public DbSet<Tag> Tags { get; set; }
         public DbSet<CredentialTag> CredentialTags { get; set; }
 
+        /// <summary>
+        /// Keyless DbSet backed by the vwUserVaultAccess view.
+        /// Use this to check or list vault access without duplicating the Owner/Shared union logic.
+        /// </summary>
+        public DbSet<VaultAccessRow> VaultAccess { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -174,6 +180,13 @@ namespace PassManAPI.Data
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
+
+            // Keyless entity mapped to the vwUserVaultAccess view (MySQL only).
+            // HasNoKey() tells EF Core this is read-only and has no primary key.
+            modelBuilder.Entity<VaultAccessRow>()
+                .HasNoKey()
+                .ToView("vwUserVaultAccess");
+
         }
     }
 }

@@ -20,9 +20,6 @@ namespace PassManAPI.Models
         /// </summary>
         public string? TotpSecret { get; set; }
 
-        /// <summary>
-        /// Link to the user's subscription tier.
-        /// </summary>
         public Guid? SubscriptionTierId { get; set; }
 
         // Navigation properties
