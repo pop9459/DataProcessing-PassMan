@@ -1,7 +1,40 @@
 ﻿@inherits LayoutComponentBase
+@using PassManGUI.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
 
 <div class="page">
-    @Body
+    <!-- Hamburger Button (Always Visible) -->
+    <button class="hamburger-btn" @onclick="ToggleNavMenu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+
+    <!-- Slide-out Sidebar -->
+    <div class="sidebar @(navMenuVisible ? "open" : "")">
+        <div class="sidebar-header">
+            <button class="close-btn" @onclick="CloseNavMenu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <NavMenu OnLinkClick="CloseNavMenu" />
+    </div>
+
+    <!-- Backdrop -->
+    @if (navMenuVisible)
+    {
+        <div class="nav-backdrop" @onclick="CloseNavMenu"></div>
+    }
+
+    <!-- Main Content -->
+    <main>
+        <div class="content-area">
+            @Body
+        </div>
+    </main>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -9,3 +42,26 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool navMenuVisible = false;
+
+    private void ToggleNavMenu()
+    {
+        navMenuVisible = !navMenuVisible;
+    }
+
+    private void CloseNavMenu()
+    {
+        navMenuVisible = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthService.InitializeAsync();
+            StateHasChanged();
+        }
+    }
+}

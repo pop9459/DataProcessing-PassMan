@@ -56,6 +56,56 @@ dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 - No direct DbContext calls; behaviors observed via HTTP (except seeding checks that use RoleManager via DI).
 - No real JWT/claim-based auth; only the dev header scheme for test runs.
 
+## Postman smoke tests (end-to-end)
+
+The collection `scripts/PASSMAN-tests.postman_collection.json` covers the full API surface against a live MySQL instance. It exercises every endpoint in order — auth, vaults, credentials, tags, invitations, vault shares, and audit — and is the primary way to verify the complete request/response cycle including content negotiation (JSON and XML).
+
+### Prerequisites
+- API running in **Test** environment on `http://localhost:5248`:
+  ```
+  ASPNETCORE_ENVIRONMENT=Test dotnet run --project PassManAPI
+  ```
+  The Test environment activates the `X-UserId` dev-header auth scheme. Without it, all requests will return 401.
+- A running **MySQL** instance (the collection hits a real DB, not SQLite in-memory).
+- Postman desktop app or Newman CLI.
+- A Postman environment with at least these variables set before the first run:
+  | Variable | Example value | Set by |
+  |---|---|---|
+  | `baseUrl` | `http://localhost:5248` | you |
+  | `userPassword` | `Password1!` | you |
+  | All others (`userId`, `vaultId`, `credentialId`, …) | _(any)_ | tests set them automatically |
+
+### How to run (Postman desktop)
+1. **Import**: File → Import → select `scripts/PASSMAN-tests.postman_collection.json`.
+2. **Select environment**: choose the environment containing `baseUrl` and `userPassword`.
+3. **Run**: open the Collection Runner, select the collection, and click **Run**.
+
+### How to run (Newman CLI)
+```bash
+npm install -g newman
+newman run scripts/PASSMAN-tests.postman_collection.json \
+  --env-var baseUrl=http://localhost:5248 \
+  --env-var userPassword=Password1!
+```
+
+### What the collection covers
+Each folder runs sequentially; later folders depend on IDs set by earlier ones.
+
+| Folder | Key assertions |
+|---|---|
+| **Auth** | Register, login, profile CRUD, password change, 2FA flow, role assignment |
+| **Vaults** | CRUD, 403 on foreign vaults, soft-delete cascade |
+| **Credentials** | CRUD, password retrieval, tag assignment (set/add/remove) |
+| **Tags** | CRUD, rename conflict, forbidden operations |
+| **Invitations** | Create, list, accept, revoke |
+| **VaultShares** | Share, update permission, revoke, forbidden |
+| **Audit** | Paginated log listing, single-log lookup, filters |
+
+### Notes
+- The collection creates its own smoke user (`smoke+{timestamp}@test.local`) on every run — no manual DB setup needed.
+- If a run stops early and leaves partial state (stale `vaultId`, etc.) clear the environment variables and start a fresh run.
+- JSON and XML content negotiation tests are included; responses are validated for both formats on key endpoints.
+
 ## Developer debugging tips
 - Check HTTP responses and payloads for `/api/auth/*`, `/api/vaults`, `/api/vaults/{id}/share`, `/api/vaults/{vaultId}/credentials`.
 - Headers: verify `Authorization` (dev token) and `X-UserId`.

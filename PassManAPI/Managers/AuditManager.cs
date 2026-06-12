@@ -126,7 +126,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -195,7 +195,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -274,7 +274,7 @@ public class AuditManager : IAuditService
 
             return AuditOperationResult<PaginatedAuditResult>.Ok(new PaginatedAuditResult
             {
-                Items = items.Select(MapToDto),
+                Items = items.Select(MapToDto).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -315,22 +315,23 @@ public class AuditManager : IAuditService
 
     private static AuditLogDto MapToDto(AuditLog auditLog)
     {
-        return new AuditLogDto(
-            Id: auditLog.Id,
-            Action: auditLog.Action,
-            ActionName: auditLog.Action.ToString(),
-            EntityType: auditLog.EntityType,
-            EntityId: auditLog.EntityId,
-            Details: auditLog.Details,
-            UserId: auditLog.UserId,
-            UserEmail: auditLog.User?.Email,
-            VaultId: auditLog.VaultId,
-            VaultName: auditLog.Vault?.Name,
-            CredentialId: auditLog.CredentialId,
-            CredentialTitle: auditLog.Credential?.Title,
-            IpAddress: auditLog.IpAddress,
-            UserAgent: auditLog.UserAgent,
-            Timestamp: auditLog.Timestamp
-        );
+        return new AuditLogDto
+        {
+            Id = auditLog.Id,
+            Action = auditLog.Action,
+            ActionName = auditLog.Action.ToString(),
+            EntityType = auditLog.EntityType,
+            EntityId = auditLog.EntityId,
+            Details = auditLog.Details,
+            UserId = auditLog.UserId,
+            UserEmail = auditLog.User?.Email,
+            VaultId = auditLog.VaultId,
+            VaultName = auditLog.Vault?.Name,
+            CredentialId = auditLog.CredentialId,
+            CredentialTitle = auditLog.Credential?.Title,
+            IpAddress = auditLog.IpAddress,
+            UserAgent = auditLog.UserAgent,
+            Timestamp = auditLog.Timestamp
+        };
     }
 }

@@ -15,11 +15,14 @@ public interface IApiService
     // Vaults
     Task<ApiResponse<List<VaultResponse>>> GetVaultsAsync(int userId);
     Task<ApiResponse<VaultResponse>> GetVaultByIdAsync(int vaultId);
+    Task<ApiResponse<VaultResponse>> CreateVaultAsync(CreateVaultRequest request);
+    Task<ApiResponse<VaultResponse>> UpdateVaultAsync(int vaultId, UpdateVaultRequest request);
+    Task<ApiResponse<bool>> DeleteVaultAsync(int vaultId);
     
     // Vault Items (Credentials)
     Task<ApiResponse<List<VaultItemModel>>> GetVaultItemsAsync(int vaultId);
-    Task<ApiResponse<VaultItemModel>> GetVaultItemByIdAsync(int itemId);
-    Task<ApiResponse<VaultItemModel>> CreateVaultItemAsync(CreateVaultItemRequest request);
-    Task<ApiResponse<VaultItemModel>> UpdateVaultItemAsync(int itemId, UpdateVaultItemRequest request);
-    Task<ApiResponse<bool>> DeleteVaultItemAsync(int itemId);
+    Task<ApiResponse<VaultItemModel>> GetVaultItemByIdAsync(int vaultId, int itemId);
+    Task<ApiResponse<VaultItemModel>> CreateVaultItemAsync(int vaultId, CreateVaultItemRequest request);
+    Task<ApiResponse<VaultItemModel>> UpdateVaultItemAsync(int vaultId, int itemId, UpdateVaultItemRequest request);
+    Task<ApiResponse<bool>> DeleteVaultItemAsync(int vaultId, int itemId);
 }

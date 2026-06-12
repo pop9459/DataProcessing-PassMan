@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using PassManGUI.Models;
+using Microsoft.JSInterop;
 
 namespace PassManGUI.Services;
 
@@ -11,16 +12,39 @@ public class ApiService : IApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<ApiService> _logger;
+    private readonly IJSRuntime _jsRuntime;
     private readonly JsonSerializerOptions _jsonOptions;
+    private const string UserIdKey = "passman_userId";
 
-    public ApiService(HttpClient httpClient, ILogger<ApiService> logger)
+    public ApiService(HttpClient httpClient, ILogger<ApiService> logger, IJSRuntime jsRuntime)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _jsRuntime = jsRuntime;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         };
+    }
+    
+    /// <summary>
+    /// Ensures the X-UserId header is set for authenticated API calls
+    /// </summary>
+    private async Task EnsureAuthHeadersAsync()
+    {
+        try
+        {
+            var userIdStr = await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", UserIdKey);
+            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            {
+                _httpClient.DefaultRequestHeaders.Remove("X-UserId");
+                _httpClient.DefaultRequestHeaders.Add("X-UserId", userId.ToString());
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // JS interop not available during prerendering - skip header setup
+        }
     }
 
     #region Authentication
@@ -99,6 +123,7 @@ public class ApiService : IApiService
     {
         try
         {
+            await EnsureAuthHeadersAsync();
             var response = await _httpClient.GetAsync($"/api/vaults?userId={userId}");
             
             if (response.IsSuccessStatusCode)
@@ -121,6 +146,7 @@ public class ApiService : IApiService
     {
         try
         {
+            await EnsureAuthHeadersAsync();
             var response = await _httpClient.GetAsync($"/api/vaults/{vaultId}");
             
             if (response.IsSuccessStatusCode)
@@ -139,6 +165,74 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<ApiResponse<VaultResponse>> CreateVaultAsync(CreateVaultRequest request)
+    {
+        try
+        {
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.PostAsJsonAsync("/api/vaults", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var vault = await response.Content.ReadFromJsonAsync<VaultResponse>(_jsonOptions);
+                return ApiResponse<VaultResponse>.SuccessResponse(vault!);
+            }
+
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            return ApiResponse<VaultResponse>.ErrorResponse(errorMessage, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating vault");
+            return ApiResponse<VaultResponse>.ErrorResponse("Network error. Please try again.");
+        }
+    }
+
+    public async Task<ApiResponse<VaultResponse>> UpdateVaultAsync(int vaultId, UpdateVaultRequest request)
+    {
+        try
+        {
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.PutAsJsonAsync($"/api/vaults/{vaultId}", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var vault = await response.Content.ReadFromJsonAsync<VaultResponse>(_jsonOptions);
+                return ApiResponse<VaultResponse>.SuccessResponse(vault!);
+            }
+
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            return ApiResponse<VaultResponse>.ErrorResponse(errorMessage, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating vault {VaultId}", vaultId);
+            return ApiResponse<VaultResponse>.ErrorResponse("Network error. Please try again.");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteVaultAsync(int vaultId)
+    {
+        try
+        {
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.DeleteAsync($"/api/vaults/{vaultId}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return ApiResponse<bool>.SuccessResponse(true);
+            }
+
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            return ApiResponse<bool>.ErrorResponse(errorMessage, (int)response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting vault {VaultId}", vaultId);
+            return ApiResponse<bool>.ErrorResponse("Network error. Please try again.");
+        }
+    }
+
     #endregion
 
     #region Vault Items
@@ -147,7 +241,8 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/api/credentials?vaultId={vaultId}");
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.GetAsync($"/api/vaults/{vaultId}/credentials");
             
             if (response.IsSuccessStatusCode)
             {
@@ -165,11 +260,12 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<ApiResponse<VaultItemModel>> GetVaultItemByIdAsync(int itemId)
+    public async Task<ApiResponse<VaultItemModel>> GetVaultItemByIdAsync(int vaultId, int itemId)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/api/credentials/{itemId}");
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.GetAsync($"/api/vaults/{vaultId}/credentials/{itemId}");
             
             if (response.IsSuccessStatusCode)
             {
@@ -187,11 +283,12 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<ApiResponse<VaultItemModel>> CreateVaultItemAsync(CreateVaultItemRequest request)
+    public async Task<ApiResponse<VaultItemModel>> CreateVaultItemAsync(int vaultId, CreateVaultItemRequest request)
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/api/credentials", request);
+            await EnsureAuthHeadersAsync();
+            var response = await _httpClient.PostAsJsonAsync($"/api/vaults/{vaultId}/credentials", request);
             
             if (response.IsSuccessStatusCode)
             {
@@ -209,10 +306,11 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<ApiResponse<VaultItemModel>> UpdateVaultItemAsync(int itemId, UpdateVaultItemRequest request)
+    public async Task<ApiResponse<VaultItemModel>> UpdateVaultItemAsync(int vaultId, int itemId, UpdateVaultItemRequest request)
     {
         try
         {
+            await EnsureAuthHeadersAsync();
             var response = await _httpClient.PutAsJsonAsync($"/api/credentials/{itemId}", request);
             
             if (response.IsSuccessStatusCode)
@@ -231,10 +329,11 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<ApiResponse<bool>> DeleteVaultItemAsync(int itemId)
+    public async Task<ApiResponse<bool>> DeleteVaultItemAsync(int vaultId, int itemId)
     {
         try
         {
+            await EnsureAuthHeadersAsync();
             var response = await _httpClient.DeleteAsync($"/api/credentials/{itemId}");
             
             if (response.IsSuccessStatusCode)

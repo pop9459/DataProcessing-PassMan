@@ -5,23 +5,24 @@ namespace PassManAPI.DTOs;
 /// <summary>
 /// DTO for returning audit log entries.
 /// </summary>
-public record AuditLogDto(
-    int Id,
-    AuditAction Action,
-    string ActionName,
-    string? EntityType,
-    int? EntityId,
-    string? Details,
-    int UserId,
-    string? UserEmail,
-    int? VaultId,
-    string? VaultName,
-    int? CredentialId,
-    string? CredentialTitle,
-    string? IpAddress,
-    string? UserAgent,
-    DateTime Timestamp
-);
+public record AuditLogDto
+{
+    public int Id { get; init; }
+    public AuditAction Action { get; init; }
+    public string ActionName { get; init; } = string.Empty;
+    public string? EntityType { get; init; }
+    public int? EntityId { get; init; }
+    public string? Details { get; init; }
+    public int UserId { get; init; }
+    public string? UserEmail { get; init; }
+    public int? VaultId { get; init; }
+    public string? VaultName { get; init; }
+    public int? CredentialId { get; init; }
+    public string? CredentialTitle { get; init; }
+    public string? IpAddress { get; init; }
+    public string? UserAgent { get; init; }
+    public DateTime Timestamp { get; init; }
+}
 
 /// <summary>
 /// Filter parameters for querying audit logs.
@@ -64,11 +65,13 @@ public class AuditLogFilter
 /// </summary>
 public class PaginatedAuditResult
 {
-    public IEnumerable<AuditLogDto> Items { get; set; } = new List<AuditLogDto>();
+    // List (not IEnumerable): XmlSerializer can't serialize an interface-typed member.
+    public List<AuditLogDto> Items { get; set; } = new();
     public int TotalCount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
-    public bool HasNextPage => Page < TotalPages;
-    public bool HasPreviousPage => Page > 1;
+    // Computed fields; setters are stubs required by XmlSerializer (getter-only properties are skipped).
+    public int TotalPages { get => (int)Math.Ceiling((double)TotalCount / PageSize); set { } }
+    public bool HasNextPage { get => Page < TotalPages; set { } }
+    public bool HasPreviousPage { get => Page > 1; set { } }
 }

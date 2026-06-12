@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
-using System.Security.Claims;
+using PassManAPI.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace PassManAPI.Controllers;
@@ -14,10 +15,12 @@ namespace PassManAPI.Controllers;
 public class CredentialsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IPasswordEncryptionService _encryptionService;
 
-    public CredentialsController(ApplicationDbContext db)
+    public CredentialsController(ApplicationDbContext db, IPasswordEncryptionService encryptionService)
     {
         _db = db;
+        _encryptionService = encryptionService;
     }
 
     /// <summary>
@@ -38,15 +41,15 @@ public class CredentialsController : ControllerBase
     [Authorize(Policy = PermissionConstants.CredentialRead)]
     public async Task<IActionResult> Get(int vaultId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
-        var canAccess = await CanAccessVault(vaultId, currentUserId);
-        if (!canAccess)
+        var access = await CheckVaultAccessAsync(vaultId, currentUserId);
+        if (access is not null)
         {
-            return Forbid();
+            return access;
         }
 
         var items = await _db.Credentials
@@ -54,15 +57,15 @@ public class CredentialsController : ControllerBase
             .Where(c => c.VaultId == vaultId)
             .Include(c => c.CredentialTags)
                 .ThenInclude(ct => ct.Tag)
-            .Select(c => new
+            .Select(c => new CredentialListItemDto
             {
-                c.Id,
-                c.Title,
-                c.Username,
-                c.Url,
-                c.CreatedAt,
-                c.UpdatedAt,
-                c.LastAccessed,
+                Id = c.Id,
+                Title = c.Title,
+                Username = c.Username,
+                Url = c.Url,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt,
+                LastAccessed = c.LastAccessed,
                 Tags = c.CredentialTags.Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name)).ToList()
             })
             .ToListAsync();
@@ -78,7 +81,7 @@ public class CredentialsController : ControllerBase
     /// The provided credential data will be encrypted before being stored.
     /// </remarks>
     /// <param name="vaultId">The unique identifier of the vault where the credential will be stored.</param>
-    /// <param name="credential">The credential object to be created. The password within this object will be encrypted.</param>
+    /// <param name="request">The credential object to be created. The password within this object will be encrypted.</param>
     /// <response code="201">Returns the newly created credential's location.</response>
     /// <response code="400">If the provided credential data is invalid.</response>
     /// <response code="401">If the user is not authenticated.</response>
@@ -95,22 +98,34 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
-        var canAccess = await CanAccessVault(vaultId, currentUserId);
-        if (!canAccess)
+        var access = await CheckVaultAccessAsync(vaultId, currentUserId);
+        if (access is not null)
         {
-            return Forbid();
+            return access;
         }
+
+        // Generate a per-credential encryption key (32 bytes)
+        var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
+        
+        // Encrypt the password using the per-credential key  
+        // Note: request.EncryptedPassword contains the plaintext password from the client
+        var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
+        var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
+        
+        // Store the per-credential key as Base64 (in production, this should be encrypted with user's master password)
+        // For now, we'll store it alongside the credential (this is a simplified implementation)
+        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
 
         var credential = new Credential
         {
             Title = request.Title.Trim(),
             Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
-            EncryptedPassword = request.EncryptedPassword,
+            EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}",
             Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url.Trim(),
             Notes = request.Notes,
             CategoryId = request.CategoryId,
@@ -121,7 +136,130 @@ public class CredentialsController : ControllerBase
         _db.Credentials.Add(credential);
         await _db.SaveChangesAsync();
 
-        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new { credential.Id });
+        return Created($"/api/vaults/{vaultId}/credentials/{credential.Id}", new IdResponse { Id = credential.Id });
+    }
+
+    /// <summary>
+    /// Retrieves a single credential by its ID (without the password).
+    /// </summary>
+    /// <param name="id">The unique identifier of the credential.</param>
+    /// <response code="200">Returns the credential detail.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have access to the vault that owns this credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpGet("/api/credentials/{id:int}")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
+    [ProducesResponseType(typeof(CredentialDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id)
+    {
+        if (!User.TryGetCurrentUserId(out var currentUserId))
+        {
+            return this.UnauthorizedProblem();
+        }
+
+        var credential = await _db.Credentials
+            .AsNoTracking()
+            .Include(c => c.Category)
+            .Include(c => c.CredentialTags)
+                .ThenInclude(ct => ct.Tag)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (credential is null)
+        {
+            return this.NotFoundProblem("Credential not found.");
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return this.ForbiddenProblem();
+        }
+
+        var dto = new CredentialDto
+        {
+            Id = credential.Id,
+            Title = credential.Title,
+            Username = credential.Username,
+            Url = credential.Url,
+            Notes = credential.Notes,
+            CategoryId = credential.CategoryId,
+            CategoryName = credential.Category?.Name,
+            VaultId = credential.VaultId,
+            CreatedAt = credential.CreatedAt,
+            UpdatedAt = credential.UpdatedAt,
+            LastAccessed = credential.LastAccessed,
+            Tags = credential.CredentialTags
+                .Select(ct => new TagDto(ct.Tag.Id, ct.Tag.Name))
+                .ToList()
+        };
+
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Retrieves the decrypted password for a specific credential.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint returns the plaintext password after decryption.
+    /// Use with caution and ensure secure transmission.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the credential.</param>
+    /// <response code="200">Returns the decrypted password.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have permission to access the credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpGet("/api/credentials/{id:int}/password")]
+    [Authorize(Policy = PermissionConstants.CredentialRead)]
+    public async Task<IActionResult> GetPassword(int id)
+    {
+        if (!User.TryGetCurrentUserId(out var currentUserId))
+        {
+            return this.UnauthorizedProblem();
+        }
+
+        var credential = await _db.Credentials
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (credential is null)
+        {
+            return this.NotFoundProblem("Credential not found.");
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return this.ForbiddenProblem();
+        }
+
+        // Update last accessed timestamp
+        var credentialToUpdate = await _db.Credentials.FindAsync(id);
+        if (credentialToUpdate != null)
+        {
+            credentialToUpdate.LastAccessed = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
+        // Parse the encrypted password (format: "key:encryptedPassword")
+        var parts = credential.EncryptedPassword.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            // Handle legacy format (unencrypted)
+            return Ok(new PasswordResponse { Password = credential.EncryptedPassword });
+        }
+
+        var perCredentialKeyBase64 = parts[0];
+        var encryptedPasswordBase64 = parts[1];
+
+        var perCredentialKey = Convert.FromBase64String(perCredentialKeyBase64);
+        var encryptedPasswordBytes = Convert.FromBase64String(encryptedPasswordBase64);
+
+        // Decrypt the password
+        var decryptedPassword = _encryptionService.DecryptPassword(encryptedPasswordBytes, perCredentialKey);
+
+        return Ok(new PasswordResponse { Password = decryptedPassword });
     }
 
     /// <summary>
@@ -132,7 +270,7 @@ public class CredentialsController : ControllerBase
     /// Any sensitive information will be re-encrypted upon update.
     /// </remarks>
     /// <param name="id">The unique identifier of the credential to update.</param>
-    /// <param name="credential">The updated credential object.</param>
+    /// <param name="update">The updated credential object.</param>
     /// <response code="204">If the credential was updated successfully.</response>
     /// <response code="400">If the provided credential data is invalid.</response>
     /// <response code="401">If the user is not authenticated.</response>
@@ -148,21 +286,21 @@ public class CredentialsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         credential.Title = update.Title.Trim();
@@ -170,6 +308,61 @@ public class CredentialsController : ControllerBase
         credential.Url = string.IsNullOrWhiteSpace(update.Url) ? null : update.Url.Trim();
         credential.Notes = update.Notes;
         credential.CategoryId = update.CategoryId;
+        credential.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Updates the password of an existing credential.
+    /// </summary>
+    /// <remarks>
+    /// This endpoint updates only the password field of a credential.
+    /// The new password will be encrypted before storage.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the credential to update.</param>
+    /// <param name="request">The new password (plaintext).</param>
+    /// <response code="204">If the password was updated successfully.</response>
+    /// <response code="400">If the provided password data is invalid.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user does not have permission to modify the credential.</response>
+    /// <response code="404">If the credential with the specified ID is not found.</response>
+    [HttpPut("/api/credentials/{id:int}/password")]
+    [Authorize(Policy = PermissionConstants.CredentialUpdate)]
+    public async Task<IActionResult> UpdatePassword(int id, [FromBody] UpdateCredentialPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (!User.TryGetCurrentUserId(out var currentUserId))
+        {
+            return this.UnauthorizedProblem();
+        }
+
+        var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
+        if (credential is null)
+        {
+            return this.NotFoundProblem("Credential not found.");
+        }
+
+        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
+        if (!canAccess)
+        {
+            return this.ForbiddenProblem();
+        }
+
+        // Generate a new per-credential encryption key
+        var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
+        
+        // Encrypt the new password
+        var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
+        var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
+        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
+
+        credential.EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}";
         credential.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -192,21 +385,21 @@ public class CredentialsController : ControllerBase
     [Authorize(Policy = PermissionConstants.CredentialDelete)]
     public async Task<IActionResult> Delete(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         _db.Credentials.Remove(credential);
@@ -230,9 +423,9 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetCredentialTags(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials
@@ -243,13 +436,13 @@ public class CredentialsController : ControllerBase
 
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var tags = credential.CredentialTags
@@ -278,14 +471,16 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetCredentialTags(int id, [FromBody] AssignTagsRequest request)
     {
+        request.TagIds ??= new();
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials
@@ -294,26 +489,28 @@ public class CredentialsController : ControllerBase
 
         if (credential is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
-        // Validate all tag ids belong to the current user
-        var validTagIds = await _db.Tags
+        // Validate all tag ids belong to the current user.
+        // Pomelo MySQL EF Core 9 preview does not support primitive-collection Contains in LINQ-to-SQL,
+        // so fetch all of the user's tag IDs first and validate in memory.
+        var userTagIds = await _db.Tags
             .AsNoTracking()
-            .Where(t => t.UserId == currentUserId && request.TagIds.Contains(t.Id))
+            .Where(t => t.UserId == currentUserId)
             .Select(t => t.Id)
             .ToListAsync();
 
-        var invalidTagIds = request.TagIds.Except(validTagIds).ToList();
+        var invalidTagIds = request.TagIds.Except(userTagIds).ToList();
         if (invalidTagIds.Any())
         {
-            return BadRequest($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
+            return this.BadRequestProblem($"Invalid or unauthorized tag ids: {string.Join(", ", invalidTagIds)}");
         }
 
         // Remove existing tags
@@ -357,45 +554,45 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddTagToCredential(int id, int tagId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound("Credential not found.");
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var tag = await _db.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tagId);
         if (tag is null)
         {
-            return NotFound("Tag not found.");
+            return this.NotFoundProblem("Tag not found.");
         }
 
         if (tag.UserId != currentUserId)
         {
-            return BadRequest("Tag does not belong to the current user.");
+            return this.BadRequestProblem("Tag does not belong to the current user.");
         }
 
         var existing = await _db.CredentialTags
             .AnyAsync(ct => ct.CredentialId == id && ct.TagId == tagId);
         if (existing)
         {
-            return BadRequest("Tag is already assigned to this credential.");
+            return this.BadRequestProblem("Tag is already assigned to this credential.");
         }
 
         _db.CredentialTags.Add(new CredentialTag(id, tagId));
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Tag added successfully." });
+        return Ok(new MessageResponse { Message = "Tag added successfully." });
     }
 
     /// <summary>
@@ -415,41 +612,34 @@ public class CredentialsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveTagFromCredential(int id, int tagId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var credential = await _db.Credentials.FirstOrDefaultAsync(c => c.Id == id);
         if (credential is null)
         {
-            return NotFound("Credential not found.");
+            return this.NotFoundProblem("Credential not found.");
         }
 
         var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
         if (!canAccess)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var credentialTag = await _db.CredentialTags
             .FirstOrDefaultAsync(ct => ct.CredentialId == id && ct.TagId == tagId);
         if (credentialTag is null)
         {
-            return NotFound("Tag is not assigned to this credential.");
+            return this.NotFoundProblem("Tag is not assigned to this credential.");
         }
 
         _db.CredentialTags.Remove(credentialTag);
         await _db.SaveChangesAsync();
 
         return NoContent();
-    }
-
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
     }
 
     private async Task<bool> CanAccessVault(int vaultId, int currentUserId)
@@ -462,6 +652,22 @@ public class CredentialsController : ControllerBase
 
         var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
         return isShared;
+    }
+
+    /// <summary>
+    /// Returns null when the user may access the vault; otherwise the appropriate error result:
+    /// 404 when the vault does not exist, 403 when it exists but is not accessible. Mirrors
+    /// VaultsController so a missing vault and an unauthorized one are distinguished consistently.
+    /// </summary>
+    private async Task<IActionResult?> CheckVaultAccessAsync(int vaultId, int currentUserId)
+    {
+        if (await CanAccessVault(vaultId, currentUserId))
+        {
+            return null;
+        }
+
+        var vaultExists = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId);
+        return vaultExists ? this.ForbiddenProblem() : this.NotFoundProblem("Vault not found.");
     }
 
     public class CreateCredentialRequest

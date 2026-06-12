@@ -154,6 +154,43 @@ namespace PassManAPI.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Attachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                    b.Property<int>("CredentialId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("EncryptedSymmetricKey")
+                        .IsRequired()
+                        .HasColumnType("longblob");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId");
+
+                    b.ToTable("Attachments");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
                 {
                     b.Property<int>("Id")
@@ -351,57 +388,44 @@ namespace PassManAPI.Migrations
                     b.ToTable("CredentialTags");
                 });
 
-            modelBuilder.Entity("PassManAPI.Models.SubscriptionTier", b =>
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<bool>("AllowsSharing")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("MaxAttachmentSizeMB")
                         .HasColumnType("int");
 
-                    b.Property<int>("MaxCredentialsPerVault")
-                        .HasColumnType("int");
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("MaxVaults")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("datetime(6)");
 
-                    b.Property<string>("Name")
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("InviteToken")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(10,2)");
+                    b.Property<string>("InvitedEmail")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VaultId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.ToTable("SubscriptionTiers");
+                    b.HasIndex("InviteToken")
+                        .IsUnique();
 
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000001"),
-                            AllowsSharing = false,
-                            MaxAttachmentSizeMB = 5,
-                            MaxCredentialsPerVault = 50,
-                            MaxVaults = 3,
-                            Name = "Free",
-                            Price = 0m
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0000-000000000002"),
-                            AllowsSharing = true,
-                            MaxAttachmentSizeMB = 50,
-                            MaxCredentialsPerVault = 500,
-                            MaxVaults = 25,
-                            Name = "Premium",
-                            Price = 4.99m
-                        });
+                    b.HasIndex("VaultId", "InvitedEmail");
+
+                    b.ToTable("Invitations");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
@@ -516,8 +540,6 @@ namespace PassManAPI.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
-
-                    b.HasIndex("SubscriptionTierId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -643,6 +665,17 @@ namespace PassManAPI.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Attachment", b =>
+                {
+                    b.HasOne("PassManAPI.Models.Credential", "Credential")
+                        .WithMany("Attachments")
+                        .HasForeignKey("CredentialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Credential");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.AuditLog", b =>
                 {
                     b.HasOne("PassManAPI.Models.Credential", "Credential")
@@ -705,25 +738,26 @@ namespace PassManAPI.Migrations
                     b.Navigation("Tag");
                 });
 
+            modelBuilder.Entity("PassManAPI.Models.Invitation", b =>
+                {
+                    b.HasOne("PassManAPI.Models.Vault", "Vault")
+                        .WithMany("Invitations")
+                        .HasForeignKey("VaultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vault");
+                });
+
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
                 {
                     b.HasOne("PassManAPI.Models.User", "User")
-                        .WithMany()
+                        .WithMany("Tags")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("PassManAPI.Models.User", b =>
-                {
-                    b.HasOne("PassManAPI.Models.SubscriptionTier", "SubscriptionTier")
-                        .WithMany("Users")
-                        .HasForeignKey("SubscriptionTierId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SubscriptionTier");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Vault", b =>
@@ -769,14 +803,11 @@ namespace PassManAPI.Migrations
 
             modelBuilder.Entity("PassManAPI.Models.Credential", b =>
                 {
+                    b.Navigation("Attachments");
+
                     b.Navigation("AuditLogs");
 
                     b.Navigation("CredentialTags");
-                });
-
-            modelBuilder.Entity("PassManAPI.Models.SubscriptionTier", b =>
-                {
-                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("PassManAPI.Models.Tag", b =>
@@ -790,6 +821,8 @@ namespace PassManAPI.Migrations
 
                     b.Navigation("SharedVaults");
 
+                    b.Navigation("Tags");
+
                     b.Navigation("Vaults");
                 });
 
@@ -798,6 +831,8 @@ namespace PassManAPI.Migrations
                     b.Navigation("AuditLogs");
 
                     b.Navigation("Credentials");
+
+                    b.Navigation("Invitations");
 
                     b.Navigation("SharedUsers");
                 });

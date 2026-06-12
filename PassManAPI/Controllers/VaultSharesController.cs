@@ -2,8 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
+using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
-using System.Security.Claims;
 
 namespace PassManAPI.Controllers;
 
@@ -36,26 +37,26 @@ public class VaultSharesController : ControllerBase
     [Authorize(Policy = PermissionConstants.VaultShare)]
     public async Task<IActionResult> ShareVault(int vaultId, [FromBody] ShareRequest request)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == vaultId);
         if (vault is null)
         {
-            return NotFound("Vault not found.");
+            return this.NotFoundProblem("Vault not found.");
         }
 
         if (vault.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.UserEmail);
         if (targetUser is null)
         {
-            return NotFound("Target user not found.");
+            return this.NotFoundProblem("Target user not found.");
         }
 
         if (_db.Database.IsMySql())
@@ -78,7 +79,7 @@ public class VaultSharesController : ControllerBase
             }
         }
 
-        return Ok(new { vaultId, targetUser = targetUser.Email });
+        return Ok(new VaultShareResponse { VaultId = vaultId, TargetUser = targetUser.Email! });
     }
 
     /// <summary>
@@ -114,26 +115,26 @@ public class VaultSharesController : ControllerBase
     [Authorize(Policy = PermissionConstants.VaultShare)]
     public async Task<IActionResult> RevokeShare(int vaultId, int userId)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var vault = await _db.Vaults.FirstOrDefaultAsync(v => v.Id == vaultId);
         if (vault is null)
         {
-            return NotFound("Vault not found.");
+            return this.NotFoundProblem("Vault not found.");
         }
 
         if (vault.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var share = await _db.VaultShares.FirstOrDefaultAsync(vs => vs.VaultId == vaultId && vs.UserId == userId);
         if (share is null)
         {
-            return NotFound("Share not found.");
+            return this.NotFoundProblem("Share not found.");
         }
 
         _db.VaultShares.Remove(share);
@@ -146,10 +147,4 @@ public class VaultSharesController : ControllerBase
         public string UserEmail { get; set; } = string.Empty;
     }
 
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
 }

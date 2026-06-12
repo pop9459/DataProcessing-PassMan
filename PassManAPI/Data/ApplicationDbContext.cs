@@ -11,14 +11,16 @@ namespace PassManAPI.Data
             : base(options) { }
 
         // Core DbSets
+        // Core DbSets
         public DbSet<Vault> Vaults { get; set; }
         public DbSet<Credential> Credentials { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<VaultShare> VaultShares { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<Attachment> Attachments { get; set; }
+        public DbSet<Invitation> Invitations { get; set; }
         public DbSet<Tag> Tags { get; set; }
         public DbSet<CredentialTag> CredentialTags { get; set; }
-        public DbSet<SubscriptionTier> SubscriptionTiers { get; set; }
 
         /// <summary>
         /// Keyless DbSet backed by the vwUserVaultAccess view.
@@ -30,9 +32,8 @@ namespace PassManAPI.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Check if running against SQLite (for tests)
-            var isSqlite = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite";
-            var timestampSql = isSqlite ? "CURRENT_TIMESTAMP" : "CURRENT_TIMESTAMP(6)";
+            // Helper to get correct timestamp SQL based on provider
+            var timestampSql = Database.IsMySql() ? "CURRENT_TIMESTAMP(6)" : "CURRENT_TIMESTAMP";
 
             // User configurations
             modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
@@ -124,6 +125,36 @@ namespace PassManAPI.Data
                 .Property(al => al.Timestamp)
                 .HasDefaultValueSql(timestampSql);
 
+            // Attachment configurations
+            modelBuilder
+                .Entity<Attachment>()
+                .HasOne(a => a.Credential)
+                .WithMany(c => c.Attachments)
+                .HasForeignKey(a => a.CredentialId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Attachment>()
+                .Property(a => a.CreatedAt)
+                .HasDefaultValueSql(timestampSql);
+
+            // Invitation configurations
+            modelBuilder
+                .Entity<Invitation>()
+                .HasOne(i => i.Vault)
+                .WithMany(v => v.Invitations)
+                .HasForeignKey(i => i.VaultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder
+                .Entity<Invitation>()
+                .HasIndex(i => i.InviteToken)
+                .IsUnique();
+
+            modelBuilder
+                .Entity<Invitation>()
+                .HasIndex(i => new { i.VaultId, i.InvitedEmail });
+
             // Tag configurations
             modelBuilder
                 .Entity<Tag>()
@@ -149,17 +180,6 @@ namespace PassManAPI.Data
 
             // Seed default categories
             modelBuilder.Entity<Category>().HasData(Category.DefaultCategories);
-
-            // SubscriptionTier configurations
-            modelBuilder
-                .Entity<User>()
-                .HasOne(u => u.SubscriptionTier)
-                .WithMany(st => st.Users)
-                .HasForeignKey(u => u.SubscriptionTierId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Seed default subscription tiers
-            modelBuilder.Entity<SubscriptionTier>().HasData(SubscriptionTier.DefaultTiers);
 
             // Keyless entity mapped to the vwUserVaultAccess view (MySQL only).
             // HasNoKey() tells EF Core this is read-only and has no primary key.

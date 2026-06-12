@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Xml.Serialization;
 
 namespace PassManAPI.DTOs;
 
@@ -43,7 +44,22 @@ public class ErrorResponse
     /// </summary>
     [JsonPropertyName("errors")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [XmlIgnore] // A Dictionary isn't XML-serializable; XML uses the list view below.
     public Dictionary<string, string[]>? Errors { get; set; }
+
+    /// <summary>
+    /// XML-serializable view of <see cref="Errors"/>. JSON emits the <c>errors</c> object above;
+    /// XML can't serialize a dictionary, so the same field errors are exposed here as a list so that
+    /// error bodies carry validation details in <b>both</b> formats.
+    /// </summary>
+    [JsonIgnore]
+    [XmlArray("errors")]
+    [XmlArrayItem("error")]
+    public List<ValidationError>? ValidationErrors
+    {
+        get => Errors?.Select(kv => new ValidationError { Field = kv.Key, Messages = kv.Value }).ToList();
+        set => Errors = value?.ToDictionary(v => v.Field, v => v.Messages);
+    }
 
     /// <summary>
     /// Creates a Bad Request (400) error response.
@@ -136,6 +152,21 @@ public class ErrorResponse
     }
 
     /// <summary>
+    /// Creates a Locked (423) error response (e.g. account lockout).
+    /// </summary>
+    public static ErrorResponse Locked(string detail, string? traceId = null)
+    {
+        return new ErrorResponse
+        {
+            Type = "https://tools.ietf.org/html/rfc4918#section-11.3",
+            Title = "Locked",
+            Status = 423,
+            Detail = detail,
+            TraceId = traceId
+        };
+    }
+
+    /// <summary>
     /// Creates an Internal Server Error (500) response.
     /// </summary>
     public static ErrorResponse InternalServerError(string? detail = null, string? traceId = null)
@@ -149,4 +180,17 @@ public class ErrorResponse
             TraceId = traceId
         };
     }
+}
+
+/// <summary>
+/// XML-serializable representation of a single field's validation errors
+/// (the dictionary form used for JSON isn't XML-serializable).
+/// </summary>
+public class ValidationError
+{
+    [XmlAttribute("field")]
+    public string Field { get; set; } = string.Empty;
+
+    [XmlElement("message")]
+    public string[] Messages { get; set; } = Array.Empty<string>();
 }

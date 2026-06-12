@@ -320,12 +320,12 @@
         width: 100%;
         right: -100%;
     }
-    
+
     .panel-content {
         padding: 20px;
         padding-top: 60px;
     }
-    
+
     .panel-actions {
         flex-direction: column;
     }

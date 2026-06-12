@@ -200,6 +200,199 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
         items!.Should().NotContain(i => i.Id == created.Id);
     }
 
+    [Fact]
+    public async Task Owner_Can_Get_Credential_By_Id()
+    {
+        var user = await RegisterAsync("cred-getbyid@test.local");
+
+        var vaultReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "GetById Vault", userId = user.User.Id })
+        };
+        vaultReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultResp = await _client.SendAsync(vaultReq);
+        vaultResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vault = await vaultResp.Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        var credReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/credentials")
+        {
+            Content = JsonContent.Create(new
+            {
+                Title = "GetById Cred",
+                Username = "gbuser",
+                EncryptedPassword = "secret123",
+                Url = "https://example.com",
+                Notes = "some notes"
+            })
+        };
+        credReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credResp = await _client.SendAsync(credReq);
+        credResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await credResp.Content.ReadFromJsonAsync<IdResponse>();
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created!.Id}");
+        getReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await getResp.Content.ReadFromJsonAsync<CredentialDetail>();
+        detail.Should().NotBeNull();
+        detail!.Id.Should().Be(created.Id);
+        detail.Title.Should().Be("GetById Cred");
+        detail.Username.Should().Be("gbuser");
+        detail.Notes.Should().Be("some notes");
+        detail.VaultId.Should().Be(vault.Id);
+    }
+
+    [Fact]
+    public async Task GetCredentialById_Returns_404_For_Missing_Credential()
+    {
+        var user = await RegisterAsync("cred-getbyid-404@test.local");
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, "/api/credentials/999999");
+        getReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetCredentialById_Returns_403_For_Other_Users_Credential()
+    {
+        var owner = await RegisterAsync("cred-getbyid-owner@test.local");
+        var other = await RegisterAsync("cred-getbyid-other@test.local");
+
+        var vaultReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "Private Vault", userId = owner.User.Id })
+        };
+        vaultReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var vault = await (await _client.SendAsync(vaultReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        var credReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vault!.Id}/credentials")
+        {
+            Content = JsonContent.Create(new { Title = "Private Cred", EncryptedPassword = "secret" })
+        };
+        credReq.Headers.Add("X-UserId", owner.User.Id.ToString());
+        var created = await (await _client.SendAsync(credReq)).Content.ReadFromJsonAsync<IdResponse>();
+
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created!.Id}");
+        getReq.Headers.Add("X-UserId", other.User.Id.ToString());
+        var getResp = await _client.SendAsync(getReq);
+        getResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Retrieve_Decrypted_Password()
+    {
+        var user = await RegisterAsync("cred-password-get@test.local");
+
+        // Create vault
+        var vault = new
+        {
+            name = "Owner Vault",
+            description = "owner vault",
+            userId = user.User.Id
+        };
+        var vaultRequest = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(vault)
+        };
+        vaultRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultResponse = await _client.SendAsync(vaultRequest);
+        vaultResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vaultPayload = await vaultResponse.Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        // Create credential with plaintext password
+        var originalPassword = "MySecretPassword123!";
+        var cred = new
+        {
+            Title = "Email",
+            Username = "alice",
+            EncryptedPassword = originalPassword,
+            Url = "https://mail.test",
+            Notes = "test note",
+            CategoryId = (int?)null
+        };
+        var credRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultPayload!.Id}/credentials")
+        {
+            Content = JsonContent.Create(cred)
+        };
+        credRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credResponse = await _client.SendAsync(credRequest);
+        credResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await credResponse.Content.ReadFromJsonAsync<IdResponse>();
+
+        // Retrieve decrypted password
+        var getPasswordReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created!.Id}/password");
+        getPasswordReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getPasswordResp = await _client.SendAsync(getPasswordReq);
+        getPasswordResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var passwordPayload = await getPasswordResp.Content.ReadFromJsonAsync<PasswordResponse>();
+        passwordPayload.Should().NotBeNull();
+        passwordPayload!.Password.Should().Be(originalPassword);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Update_Password()
+    {
+        var user = await RegisterAsync("cred-password-update@test.local");
+
+        // Create vault
+        var vault = new
+        {
+            name = "Owner Vault",
+            description = "owner vault",
+            userId = user.User.Id
+        };
+        var vaultRequest = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(vault)
+        };
+        vaultRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultResponse = await _client.SendAsync(vaultRequest);
+        vaultResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var vaultPayload = await vaultResponse.Content.ReadFromJsonAsync<CreatedVaultResponse>();
+
+        // Create credential
+        var originalPassword = "OldPassword123!";
+        var cred = new
+        {
+            Title = "Email",
+            Username = "alice",
+            EncryptedPassword = originalPassword,
+            Url = "https://mail.test",
+            Notes = "test note",
+            CategoryId = (int?)null
+        };
+        var credRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultPayload!.Id}/credentials")
+        {
+            Content = JsonContent.Create(cred)
+        };
+        credRequest.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credResponse = await _client.SendAsync(credRequest);
+        credResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await credResponse.Content.ReadFromJsonAsync<IdResponse>();
+
+        // Update password
+        var newPassword = "NewPassword456!";
+        var updatePasswordReq = new HttpRequestMessage(HttpMethod.Put, $"/api/credentials/{created!.Id}/password")
+        {
+            Content = JsonContent.Create(new { EncryptedPassword = newPassword })
+        };
+        updatePasswordReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var updatePasswordResp = await _client.SendAsync(updatePasswordReq);
+        updatePasswordResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Verify new password
+        var getPasswordReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{created.Id}/password");
+        getPasswordReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var getPasswordResp = await _client.SendAsync(getPasswordReq);
+        getPasswordResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var passwordPayload = await getPasswordResp.Content.ReadFromJsonAsync<PasswordResponse>();
+        passwordPayload.Should().NotBeNull();
+        passwordPayload!.Password.Should().Be(newPassword);
+    }
+
     private async Task<AuthResponse> LoginAsync(string email, string password)
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
@@ -231,6 +424,20 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
 
     private record CreatedVaultResponse(int Id);
 
+    private record CredentialDetail(
+        int Id,
+        string Title,
+        string? Username,
+        string? Url,
+        string? Notes,
+        int? CategoryId,
+        string? CategoryName,
+        int VaultId,
+        DateTime CreatedAt,
+        DateTime? UpdatedAt,
+        DateTime? LastAccessed
+    );
+
     private record CredentialListItem(
         int Id,
         string Title,
@@ -242,5 +449,7 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
     );
 
     private record IdResponse(int Id);
+
+    private record PasswordResponse(string Password);
 }
 
