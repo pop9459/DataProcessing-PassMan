@@ -34,6 +34,7 @@ SELECT v.Id AS VaultId,
        v.UserId AS AccessUserId,
        'Owner' AS AccessType
   FROM Vaults v
+ WHERE v.IsDeleted = 0
 UNION
 SELECT vs.VaultId,
        v.Name AS VaultName,
@@ -41,7 +42,8 @@ SELECT vs.VaultId,
        vs.UserId AS AccessUserId,
        'Shared' AS AccessType
   FROM VaultShares vs
-  JOIN Vaults v ON v.Id = vs.VaultId;";
+  JOIN Vaults v ON v.Id = vs.VaultId
+ WHERE v.IsDeleted = 0;";
             await ExecuteAsync(conn, tx, createView);
 
             // Stored procedure: add vault share by email with validation and idempotency

@@ -36,6 +36,11 @@ public class VaultSharesController : ControllerBase
     /// <response code="404">If the vault or user is not found.</response>
     [HttpPost]
     [Authorize(Policy = PermissionConstants.VaultShare)]
+    [ProducesResponseType(typeof(VaultShareResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ShareVault(int vaultId, [FromBody] ShareRequest request)
     {
         if (!User.TryGetCurrentUserId(out var currentUserId))
@@ -144,6 +149,10 @@ public class VaultSharesController : ControllerBase
     /// </summary>
     [HttpDelete("{userId}")]
     [Authorize(Policy = PermissionConstants.VaultShare)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RevokeShare(int vaultId, int userId)
     {
         if (!User.TryGetCurrentUserId(out var currentUserId))
