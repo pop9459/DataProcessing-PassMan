@@ -272,7 +272,7 @@ public class Program
         {
             // Call DB to test the connectivity
             var conn = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? "Server=db;Port=3306;Database=passManDB;User=root;Password=hihi";
+                       ?? "Server=db;Port=3306;Database=passManDB;User=passman_app;Password=passman_app_dev_pw";
             await SqlTest.RunAsync(conn);
         }
 

@@ -10,7 +10,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - DOTNET_USE_POLLING_FILE_WATCHER=true
-      - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=root;Password=hihi;Pooling=true
+      - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=passman_app;Password=${DB_APP_PASSWORD:-passman_app_dev_pw};Pooling=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-32chars}
     command: dotnet watch --project PassManAPI.csproj run --urls http://0.0.0.0:8080
     volumes:
@@ -66,11 +66,19 @@ services:
   db:
    image: mysql:8.0
    container_name: db
+   # MySQL 8.0 enables binary logging by default, which would otherwise require SUPER for the
+   # non-root app account to create the startup trigger/stored procedures (see DatabaseArtifacts).
+   command: --log-bin-trust-function-creators=1
    ports:
      - "3306:3306"
    environment:
      - MYSQL_ROOT_PASSWORD=hihi
      - MYSQL_DATABASE=passManDB
+     # Dedicated least-privilege application account. The MySQL image grants this user ALL
+     # privileges on passManDB only (no other databases, no server-admin rights). The API uses it
+     # instead of root; root stays for DB administration / the healthcheck.
+     - MYSQL_USER=passman_app
+     - MYSQL_PASSWORD=${DB_APP_PASSWORD:-passman_app_dev_pw}
    volumes:
      - mysql-data:/var/lib/mysql
    healthcheck:
