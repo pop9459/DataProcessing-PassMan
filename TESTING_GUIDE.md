@@ -1,34 +1,42 @@
 # Testing Guide
 
-Two test layers: xUnit integration tests (SQLite, no Docker needed) and a Postman/Newman collection (full stack against MySQL).
+Two test layers: **xUnit** (integration, SQLite in-memory, no Docker needed) and **Newman** (end-to-end, full stack against MySQL in Docker).
 
 ---
 
-## xUnit integration tests
+## Running the tests
 
-Run against an in-memory SQLite database via `TestWebApplicationFactory`. Auth uses a dev-header scheme (`X-UserId`) instead of real JWT. 121 tests, 0 failures.
-
+**Integration tests:**
 ```bash
-dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
-# or in Docker:
 docker compose run --rm test
 ```
+Local `dotnet test` also works but requires .NET 10 SDK to be installed — Docker is the supported path.
 
-### Test classes
+**E2E tests (Newman):**
+```bash
+docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
+```
+Starts MySQL and the API, waits for the API healthcheck, runs the full collection, then exits. `--scale passman-gui=0` excludes the GUI — it isn't needed for API tests and crashes on low-memory VMs, which would abort Newman before it runs.
+
+---
+
+## Integration test classes
+
+121 tests across 15 classes. Auth uses a dev-header scheme (`X-UserId`) instead of JWT; DB is SQLite in-memory seeded with roles and demo users on startup.
 
 | Class | What it covers |
 |---|---|
 | AuthEndpointsTests | Register, login, profile GET/PUT, delete |
 | AuthorizationSeedingTests | Roles exist and carry the correct `permission` claims |
-| AuthorizationPolicyTests | Permission enforcement per role (VaultOwner allowed, VaultReader 403) |
+| AuthorizationPolicyTests | Permission enforcement per role |
 | AuthAssignRoleTests | Admin assigns role; permissions endpoint reflects it |
-| CredentialsEndpointsTests | Credential CRUD; VaultReader blocked from creating (403) |
+| JwtAuthFlowTests | JWT from register/login carries role + permission claims (regression #159) |
+| UserEndpointsTests | User profile/vaults/tags CRUD; cross-user access blocked (403) |
 | VaultEndpointsTests | Vault CRUD; shared user can read but not mutate (403) |
 | VaultSharesEndpointsTests | Share/revoke access control; `GetMyVaultAccess` ownership types |
-| UserEndpointsTests | User profile/vaults/tags CRUD; cross-user access blocked (403) |
+| CredentialsEndpointsTests | Credential CRUD; VaultReader blocked from creating (403) |
 | TagsEndpointsTests | Tag CRUD; duplicate/cross-user name handling (regression #163) |
 | AuditEndpointsTests | Log listing with pagination/filters; vault logs; admin all-logs |
-| JwtAuthFlowTests | JWT from register/login carries role+permission claims (regression #159) |
 | XmlSerializationTests | All endpoints accept XML bodies and return XML via `Accept` header |
 | InvitationTests | Full invite lifecycle (create → accept → vault visible) and revoke |
 | InvitationModelTests | Model invariants, constructor validation, EF persistence and cascade |
@@ -36,21 +44,9 @@ docker compose run --rm test
 
 ---
 
-## End-to-end tests (Newman — recommended)
+## Newman output
 
-Newman is the Postman CLI runner. It needs no account, no GUI, and has no secrets detection. It is the only reliable way to run the collection on a clean machine.
-
-```bash
-docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
-```
-
-`--scale passman-gui=0` excludes the GUI — it isn't needed for API tests and crashes on low-memory VMs (OOM in the file watcher), which would kill Newman before it runs.
-
-Newman starts automatically once the API passes its healthcheck, runs all 152 requests, then exits.
-
-### Reading the output
-
-Each request prints a block while running:
+Each request prints a block during the run:
 ```
 → Auth - Register (201)
   POST http://passman-api:8080/api/auth/register [201 Created, 1.2kB, 45ms]
@@ -66,20 +62,13 @@ A failure looks like:
      expected response to have status code 204 but got 404
 ```
 
-The summary table prints at the very end — **the `assertions` row is the one to check**:
+The summary table prints at the very end — **check the `assertions` row**:
 ```
 │              assertions │  753 │    0 │
                                     ↑       ↑
                                  total   failed
 ```
-`failed = 0` → full pass. `failed > 0` → scroll up and find the `✗` lines.
-
-Newman exits 0 on pass, 1 on any failure:
-```bash
-docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
-echo "exit: $LASTEXITCODE"   # PowerShell
-echo "exit: $?"              # bash
-```
+`failed = 0` → full pass (exit code 0). `failed > 0` → scroll up and find the `✗` lines.
 
 ### What the collection covers
 
@@ -95,11 +84,8 @@ echo "exit: $?"              # bash
 
 ---
 
-## Postman desktop (unreliable — avoid for verification)
+## Postman desktop (unreliable — use Newman instead)
 
-Importing the collection into Postman desktop works on most machines, but **we cannot guarantee it on a fresh install**. Postman has a secrets detection feature that, depending on account state and sync settings, may prompt to remove detected tokens on import — stripping all `Authorization: Bearer {{accessToken}}` headers from the collection. Every request then returns 401 and all tests fail. Reproducing the issue requires a fresh Postman account each time, so we cannot document reliable steps to avoid it.
+Importing the collection into Postman desktop works on most machines, but we cannot guarantee it on a fresh install. Postman's secrets detection may prompt to remove detected tokens on import, stripping all `Authorization: Bearer {{accessToken}}` headers — every request then returns 401 and all tests fail. Reproducing it requires a fresh Postman account each time, so there are no reliable documented steps to avoid it.
 
-**Use Newman instead.** If you do use Postman desktop:
-1. Import `scripts/PASSMAN-tests.postman_collection.json`.
-2. If prompted about secrets, choose **No, keep** (not "Remove"). If you see "Remove" was already applied and auth headers are missing, re-import.
-3. No environment needed — `baseUrl` (`http://localhost:5246`) and `userPassword` (`Password1!`) are collection variables. All other variables are set automatically as the collection runs.
+If you do use Postman desktop: import `scripts/PASSMAN-tests.postman_collection.json`, and if prompted about secrets choose **No, keep** (not "Remove"). No environment needed — `baseUrl` (`http://localhost:5246`) and `userPassword` (`Password1!`) are collection variables; all other variables are set automatically as the collection runs.

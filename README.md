@@ -175,8 +175,7 @@ PassManGUI/
 │   └── Layout/      # Layout components
 └── Services/        # API client services
 
-PassManAPI.Tests/    # Integration tests
-└── *.cs            # 121 passing tests
+PassManAPI.Tests/    # xUnit integration tests (121 passing)
 
 scripts/             # Test tooling
 ├── PASSMAN-tests.postman_collection.json  # Postman smoke tests (full API surface)
@@ -222,39 +221,15 @@ scripts/             # Test tooling
 
 ## 🧪 Testing
 
-### Test Coverage
-- **121 passing tests** with 0 failures
-- Integration tests using in-memory SQLite
-- No MySQL dependency for tests
-- Dev header authentication (`X-UserId`)
+121 xUnit integration tests (SQLite in-memory) and a Newman collection (full stack, MySQL). Both run in Docker. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for details.
 
-### Running Tests
-
-**Docker (Recommended):**
 ```bash
+# Integration tests
 docker compose run --rm test
-```
 
-**Local:**
-```bash
-dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
-```
-
-**Specific test class:**
-```bash
-dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
-```
-
-### Test Categories
-16 test classes cover auth, vaults, credentials, tags, invitations, vault shares, audit logs, JWT flow, XML serialization, and model invariants. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for the full class-by-class breakdown.
-
-### Postman / Newman end-to-end tests
-
-`scripts/PASSMAN-tests.postman_collection.json` covers the full API surface. Import into Postman (no environment needed — `baseUrl` and `userPassword` are collection variables), or run headless with Newman via Docker:
-```bash
+# E2E tests (Newman)
 docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
 ```
-See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for full details.
 
 ## 📚 Documentation
 
