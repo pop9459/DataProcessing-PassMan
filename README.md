@@ -176,7 +176,7 @@ PassManGUI/
 └── Services/        # API client services
 
 PassManAPI.Tests/    # Integration tests
-└── *.cs            # 106 passing tests
+└── *.cs            # 121 passing tests
 
 scripts/             # Test tooling
 ├── PASSMAN-tests.postman_collection.json  # Postman smoke tests (full API surface)
@@ -223,7 +223,7 @@ scripts/             # Test tooling
 ## 🧪 Testing
 
 ### Test Coverage
-- **106 passing tests** with 0 failures
+- **121 passing tests** with 0 failures
 - Integration tests using in-memory SQLite
 - No MySQL dependency for tests
 - Dev header authentication (`X-UserId`)
@@ -232,53 +232,29 @@ scripts/             # Test tooling
 
 **Docker (Recommended):**
 ```bash
-docker-compose run --rm test
+docker compose run --rm test
 ```
 
 **Local:**
 ```bash
-# Clean first
-rm -rf PassManAPI/obj PassManAPI/bin PassManAPI.Tests/obj PassManAPI.Tests/bin
-
-# Run tests
 dotnet test PassManAPI.Tests/PassManAPI.Tests.csproj
 ```
 
-**Watch Mode:**
-```bash
-docker-compose run --rm test dotnet watch test PassManAPI.Tests/PassManAPI.Tests.csproj
-```
-
-**Specific Tests:**
+**Specific test class:**
 ```bash
 dotnet test --filter "FullyQualifiedName~AuthEndpointsTests"
 ```
 
 ### Test Categories
-- **AuthEndpointsTests**: Registration, login, JWT validation
-- **SubscriptionTierTests**: Tier seeding and assignment
-- **VaultEndpointsTests**: CRUD operations and permissions
-- **CredentialsEndpointsTests**: Credential management
-- **InvitationTests**: Vault sharing workflows
-- **AttachmentModelTests**: File attachment handling
-- **AuthorizationPolicyTests**: Role-based access control
+16 test classes cover auth, vaults, credentials, tags, invitations, vault shares, audit logs, JWT flow, XML serialization, and model invariants. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for the full class-by-class breakdown.
 
-### Postman smoke tests (end-to-end)
+### Postman / Newman end-to-end tests
 
-`scripts/PASSMAN-tests.postman_collection.json` covers the full API surface against a live MySQL instance. Import it into Postman or run with Newman:
-
+`scripts/PASSMAN-tests.postman_collection.json` covers the full API surface. Import into Postman (no environment needed — `baseUrl` and `userPassword` are collection variables), or run headless with Newman via Docker:
 ```bash
-# API must be running in Test environment first
-ASPNETCORE_ENVIRONMENT=Test dotnet run --project PassManAPI
-
-# Then run the collection (Newman)
-npm install -g newman
-newman run scripts/PASSMAN-tests.postman_collection.json \
-  --env-var baseUrl=http://localhost:5248 \
-  --env-var userPassword=Password1!
+docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
 ```
-
-Set `baseUrl` and `userPassword` in a Postman environment; all other variables (`userId`, `vaultId`, `credentialId`, …) are set automatically by the collection as it runs. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for full details.
+See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for full details.
 
 ## 📚 Documentation
 
