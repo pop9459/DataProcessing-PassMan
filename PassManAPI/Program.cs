@@ -309,6 +309,9 @@ public class Program
         // Map controller routes (API only)
         app.MapControllers();
 
+        // Unauthenticated liveness probe — used by Docker healthcheck and Newman depends_on.
+        app.MapGet("/health", () => Results.Ok()).AllowAnonymous();
+
         app.Run();
     }
 }
