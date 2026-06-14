@@ -289,6 +289,7 @@ Set `baseUrl` and `userPassword` in a Postman environment; all other variables (
 - **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
 - **[docs/DATABASE.md](docs/DATABASE.md)** - Dedicated least-privilege DB account & provisioning
 - **[docs/XML.md](docs/XML.md)** - How to send and receive XML (every endpoint supports JSON and XML)
+- **[docs/VALIDATION.md](docs/VALIDATION.md)** - All input validation rules (DataAnnotations + FluentValidation)
 - **Swagger UI**: http://localhost:5246/swagger
 
 ## 🎯 Current Features
