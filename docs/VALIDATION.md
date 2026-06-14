@@ -11,17 +11,32 @@ FluentValidation).
 | 1. Request models | **DataAnnotations** (`[Required]`, `[EmailAddress]`, …) | Every request DTO | `400` with field errors |
 | 2. Request models | **FluentValidation** auto-validation | Auth, Vault, Credential requests | `400` with field errors |
 | 3. Identity | `IdentityOptions` (`Program.cs`) | Password policy, lockout, email uniqueness/confirmation | `400`/`401`/`423` |
-| 4. Domain | Invariants in entity constructors/methods (throw) | `Tag`, `Invitation`, `Attachment`, … | `400`/`500` via the global exception handler |
+| 4. Domain | Invariants in entity methods (throw) | `Tag`, `Invitation`, `Attachment`, … | `400` (never `500` — see [Domain invariants](#domain-invariants-model-layer)) |
 
-Layers 1–2 run during model binding (`[ApiController]`). All field errors are collected into
-`ModelState` and returned as the standardized `ErrorResponse` (RFC7807) via the
-`InvalidModelStateResponseFactory` in `Program.cs`, content-negotiated as JSON **or** XML
-(see [docs/XML.md](XML.md)):
+Layers 1–2 run during model binding (`[ApiController]`). Field errors are collected into `ModelState`
+and returned as the standardized `ErrorResponse` via the `InvalidModelStateResponseFactory` in
+`Program.cs`, content-negotiated as JSON **or** XML (see [docs/XML.md](XML.md)).
+
+`ErrorResponse` follows the [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) Problem Details
+schema — `type` (a URI), `title`, `status`, `detail` — plus two extension members that RFC 7807
+explicitly permits: `traceId`, and `errors` (a field → messages map, present only on validation
+failures). A validation `400` therefore looks like:
 
 ```json
-{ "title": "One or more validation errors occurred.", "status": 400,
-  "errors": { "Email": ["A valid email address is required."] }, "traceId": "…" }
+{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "detail": null,
+  "traceId": "00-…-00",
+  "errors": { "Email": ["A valid email address is required."] }
+}
 ```
+
+> **Media types:** pipeline-level errors (global exception handler, 401/403) are served as
+> `application/problem+json`; controller/validation errors are content-negotiated as
+> `application/json` or `application/xml`. `detail` carries the human-readable message for
+> non-validation errors; validation errors put the per-field detail in `errors`.
 
 ## Request validation rules
 
@@ -95,13 +110,32 @@ Minimum 8 chars, with at least one uppercase, one lowercase, one digit and one n
 
 ## Domain invariants (model layer)
 
-Beyond request validation, entities guard their own invariants and throw on violation (surfaced as
-`400`/`500` by the global exception handler):
+Beyond request validation, entities guard their own invariants and throw on violation. **These always
+resolve to `400`, never `500`** — by three mechanisms in order:
 
-- **`Tag`** — name cannot be empty.
+1. **Pre-empted by DTO validation (layers 1–2).** Bad input is rejected before the entity is
+   constructed — e.g. a blank/whitespace tag name fails `[Required]` (which trims internally) and
+   returns a `400` validation error first. (Verified live: `PUT /api/tags/{id}` with `"   "` → `400`.)
+2. **Caught in the controller.** Reachable domain checks are caught and returned as `400` — e.g.
+   `InvitationsController.AcceptInvitation` catches `Invitation.MarkAccepted()`'s
+   `InvalidOperationException` and returns `BadRequestProblem`.
+3. **Mapped by the global handler.** Anything that still reaches `ExceptionHandlerMiddleware` is
+   mapped to `400`: `ArgumentException` and `InvalidOperationException` (the only types these
+   invariants throw) → `BadRequest`. Only genuinely unexpected exceptions fall through to `500`.
+
+The guarded invariants:
+
+- **`Tag`** — `Rename()` rejects an empty/whitespace name.
 - **`Invitation`** — invited email required + valid format; token required, ≤100; expiry must be in
   the future; `MarkAccepted()` / role changes rejected once accepted or expired.
 - **`Attachment`** — file name/path required and length-bounded; encryption key required.
+
+## Success response codes
+
+This page documents the **validation (failure)** path. Success codes for every endpoint —
+`200 OK`, `201 Created`, `204 No Content` — are declared per action with
+`[ProducesResponseType(...)]` and rendered in **Swagger** (`/swagger`), and are asserted end-to-end by
+the Postman/Newman collection (see [TESTING_GUIDE.md](../TESTING_GUIDE.md)).
 
 ## Reconciling FluentValidation vs DataAnnotations
 
