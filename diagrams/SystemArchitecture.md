@@ -1,131 +1,118 @@
 # PassMan System Architecture
 
-## High-Level Architecture Overview
+## High-Level Architecture
 
 ```
+                            ┌──────────────────┐
+                            │     CLIENT       │
+                            │   (Web Browser)  │
+                            └────────┬─────────┘
+                                     ↑
+                                     │ HTTP (port 5246)
+                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        ASP.NET Core Application                             │
 │                                                                             │
-│  ┌──────────────────── PRESENTATION LAYER ────────────────────────────────┐ │
-│  │                                                                        │ │
-│  │  [INV_CTRL]  [CRED_CTRL]  [VAULT_CTRL]  [TAG_CTRL]  [SHARE_CTRL]       │ │
-│  │                                                                        │ │
-│  │  [AUDIT_CTRL]  [AUTH_CTRL]  [USER_CTRL]                                │ │
-│  │                                                                        │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                      ↓                                      │
 │  ┌──────────────────── SECURITY LAYER ────────────────────────────────────┐ │
 │  │                                                                        │ │
-│  │            [JWT (OAuth 2.0)] → [AUTHZ] → [IDENTITY]                    │ │
+│  │            [JWT Validation] → [Authorization] → [ASP.NET Identity]     │ │
 │  │                                                                        │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
+│                                      ↑                                      │
+│                                      │ in-process                           │
+│                                      ↓                                      │
+│  ┌──────────────────── PRESENTATION LAYER ────────────────────────────────┐ │
+│  │                                                                        │ │
+│  │  [AUTH_CTRL]  [USER_CTRL]  [VAULT_CTRL]  [CRED_CTRL]  [SHARE_CTRL]    │ │
+│  │                                                                        │ │
+│  │  [INV_CTRL]  [TAG_CTRL]  [AUDIT_CTRL]                                  │ │
+│  │                                                                        │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                      ↑                                      │
+│                                      │ in-process                           │
 │                                      ↓                                      │
 │  ┌────────────────── BUSINESS LOGIC LAYER ────────────────────────────────┐ │
-│  │                                                                        │ │
-│  │  [AUTH_MGR] → [BCRYPT], [TOTP], [GOOGLE]                               │ │
 │  │                                                                        │ │
 │  │  [VAULT_MGR] → [AUDIT_LOG]                                             │ │
 │  │                                                                        │ │
 │  │  [CRED_MGR] → [ENCRYPT], [ATTACH], [AUDIT_LOG]                         │ │
 │  │                                                                        │ │
-│  │  [SHARE_MGR] → [AUDIT_LOG], [EMAIL]                                    │ │
+│  │  [SHARE_MGR] → [AUDIT_LOG], [EMAIL (SMTP)]                             │ │
 │  │                                                                        │ │
 │  │  [AUDIT_MGR] → [AUDIT_LOG]                                             │ │
 │  │                                                                        │ │
-│  │  [USER_MGR] → [SUBSCRIPTION]                                           │ │
+│  │  [USER_MGR]                                                            │ │
 │  │                                                                        │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
+│                                      ↑                                      │
+│                                      │ in-process                           │
 │                                      ↓                                      │
 │  ┌─────────────────── DATA ACCESS LAYER ──────────────────────────────────┐ │
 │  │                                                                        │ │
-│  │  [ApplicationDbContext] → [Entity Framework Core] → [Repository]       │ │
+│  │              [ApplicationDbContext] → [Entity Framework Core]          │ │
 │  │                                                                        │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
-│                                      ↓                                      │
+│                                      ↑                                      │
+│                                      │ MySQL protocol / TCP:3306            │
 └──────────────────────────────────────┼──────────────────────────────────────┘
                                        ↓
                             ┌──────────────────┐
-                            │  PostgreSQL /    │
-                            │  MySQL Database  │
+                            │   MySQL 8.0      │
                             └──────────────────┘
 ```
 
----
+**Security runs before controllers.** Every inbound request passes through JWT validation, authorization policy checks, and ASP.NET Identity resolution before any controller action executes.
 
-## Detailed Component Interaction
-
-### Client Layer
-```
-┌─────────────────┐
-│  WEB BROWSER    │
-│  (Blazor GUI)   │
-└────────┬────────┘
-         │ HTTP/HTTPS Requests
-         ↓
-┌─────────────────┐
-│  MOBILE CLIENT  │
-└────────┬────────┘
-         │
-         ↓
-```
+> **Note on scope:** A Blazor Server GUI was developed as a companion frontend but is outside the assessment scope — the graded deliverable is the REST API. The GUI is incomplete and not part of the grading rubric.
 
 ---
 
-## Presentation Layer → Managers Mapping
+## Controller → Manager Mapping
 
-| Controller | Primary Manager | Secondary Managers |
-|-----------|-----------------|------------------|
-| **INV_CTRL** (Invitations) | VaultManager | - |
-| **CRED_CTRL** (Credentials) | CredentialManager | VaultManager |
-| **VAULT_CTRL** (Vaults) | VaultManager | - |
-| **TAG_CTRL** (Tags) | VaultManager | - |
-| **SHARE_CTRL** (VaultShares) | SharingManager | - |
-| **AUDIT_CTRL** (Audit) | AuditManager | - |
-| **AUTH_CTRL** (Auth) | AuthManager | - |
-| **USER_CTRL** (Users) | UserManager | - |
+| Controller | Primary Manager | Notes |
+|-----------|-----------------|-------|
+| **AUTH_CTRL** (Auth) | — | Uses ASP.NET Identity directly (`UserManager<User>`, `SignInManager<User>`) |
+| **USER_CTRL** (Users) | UserManager | |
+| **VAULT_CTRL** (Vaults) | VaultManager | |
+| **CRED_CTRL** (Credentials) | CredentialManager | Also uses VaultManager for access checks |
+| **SHARE_CTRL** (VaultShares) | SharingManager | |
+| **INV_CTRL** (Invitations) | SharingManager | |
+| **TAG_CTRL** (Tags) | — | Accesses ApplicationDbContext directly |
+| **AUDIT_CTRL** (Audit) | AuditManager | |
 
 ---
 
-## Manager Responsibilities & Dependencies
-
-### **AuthManager**
-- Handles user registration, login, password reset
-- **Uses**: BCrypt (password hashing), TOTP (2FA), Google OAuth
-- **Logs to**: Audit Log
-- **Accesses**: ApplicationDbContext
+## Manager Responsibilities
 
 ### **VaultManager**
-- Creates, updates, deletes vaults
-- Manages vault metadata and soft deletes
+- Creates, updates, soft-deletes vaults
+- Enforces subscription tier limits (vault count)
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
 ### **CredentialManager**
-- Creates, reads, updates, deletes credentials
-- Manages password encryption/decryption
-- Handles attachments
-- **Uses**: Encryption Service, Attachment Handler
+- CRUD for credentials within vaults
+- Encrypts/decrypts passwords (AES-256-GCM)
+- Handles file attachments
+- **Uses**: PasswordEncryptionService
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
 ### **SharingManager**
-- Manages vault sharing permissions
-- Handles access control
-- Sends sharing notifications
+- Manages vault share records and invitations
+- Enforces share permissions (read/write)
+- Sends invitation emails
 - **Uses**: Email Service
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
-### **UserManager**
-- Manages user profiles and preferences
-- Handles subscription information
-- **Uses**: Subscription API
+### **AuditManager**
+- Writes to the audit log via `sp_LogAudit` stored procedure
+- Used by all other managers
 - **Accesses**: ApplicationDbContext
 
-### **AuditManager**
-- Logs all security-relevant events
-- Tracks user actions, access patterns
-- **Logs to**: Audit Log
+### **UserManager**
+- Manages user profiles and subscription tier
 - **Accesses**: ApplicationDbContext
 
 ---
@@ -133,40 +120,36 @@
 ## Security Flow
 
 ```
-┌──────────────┐
-│   REQUEST    │
-└──────┬───────┘
-       │
-       ↓
-┌──────────────────────┐
-│  HTTPS / TLS Layer   │
-│  (Encryption)        │
-└──────┬───────────────┘
-       │
+┌──────────────────────────────────────┐
+│  CLIENT REQUEST                      │
+│  HTTP + Authorization: Bearer <jwt>  │
+└──────┬───────────────────────────────┘
+       │ HTTP
        ↓
 ┌──────────────────────┐
 │  JWT Validation      │
-│  (OAuth 2.0 Token)   │
+│  (Bearer token)      │
 └──────┬───────────────┘
-       │
+       │ in-process
        ↓
 ┌──────────────────────┐
 │  Authorization       │
-│  (Policy Check)      │
+│  (Permission claims) │
 └──────┬───────────────┘
-       │
+       │ in-process
        ↓
 ┌──────────────────────┐
 │  Identity Resolution │
-│  (User/Roles)        │
+│  (User + Roles)      │
 └──────┬───────────────┘
-       │
+       │ in-process
        ↓
 ┌──────────────────────┐
-│  Route to Manager    │
-│  (Business Logic)    │
+│  Controller Action   │
 └──────────────────────┘
 ```
+
+Authentication uses JWT Bearer tokens. After login, the client includes the token in every request via the `Authorization: Bearer` header.
 
 ---
 
@@ -174,139 +157,55 @@
 
 ```
 1. CLIENT
-   └─→ HTTPS Request to /api/credentials
+   └─→ [HTTP] POST /api/credentials  Authorization: Bearer <jwt>
        │
-       ├─→ PRESENTATION LAYER
-       │   └─ CredentialsController.Post()
+       ├─→ SECURITY LAYER              [in-process]
+       │   ├─ JWT token validated
+       │   ├─ credential.create permission checked
+       │   └─ User identity resolved
        │
-       ├─→ SECURITY LAYER
-       │   ├─ JWT Token Validation
-       │   ├─ Authorization Policy Check
-       │   └─ Identity Resolution
+       ├─→ PRESENTATION LAYER          [in-process]
+       │   └─ CredentialsController.CreateCredential()
        │
-       ├─→ BUSINESS LOGIC LAYER
-       │   ├─ CredentialManager.CreateCredential()
-       │   ├─ Encrypts password (ENCRYPT service)
-       │   ├─ Handles attachments (ATTACH service)
-       │   └─ Logs action (AUDIT_LOG)
+       ├─→ BUSINESS LOGIC LAYER        [in-process]
+       │   ├─ CredentialManager.CreateAsync()
+       │   ├─ Encrypts password (PasswordEncryptionService / AES-256-GCM)
+       │   ├─ Handles attachment if present
+       │   └─ Logs action via AuditManager
        │
-       ├─→ DATA ACCESS LAYER
-       │   ├─ ApplicationDbContext
-       │   ├─ Entity Framework Core
-       │   └─ Repository Pattern
+       ├─→ DATA ACCESS LAYER           [in-process]
+       │   └─ ApplicationDbContext (Entity Framework Core)
        │
-       └─→ DATABASE
-           └─ Persists to Credentials table
+       └─→ DATABASE                    [MySQL protocol / TCP:3306]
+           └─ Persists to Credentials table (MySQL 8.0)
 ```
 
 ---
 
 ## Infrastructure Services
 
-### **BCRYPT** - Password Hashing
-- Used by: AuthManager
-- Purpose: Secure password storage
-- One-way hashing algorithm
-
-### **ENCRYPT** - Credential Encryption
-- Used by: CredentialManager
-- Purpose: Encrypt/decrypt sensitive password data
-- Symmetric encryption
-
-### **TOTP** - Two-Factor Authentication
-- Used by: AuthManager
-- Purpose: Generate time-based one-time passwords
-- For 2FA login
-
-### **ATTACH** - Attachment Handler
-- Used by: CredentialManager
-- Purpose: Manage file uploads/downloads
-- Handles encryption keys for attachments
-
-### **EMAIL** - Email Service
-- Used by: SharingManager, InvitationsController
-- Purpose: Send invitations, notifications
-- Integration point for email delivery
-
-### **GOOGLE OAuth** - Social Authentication
-- Used by: AuthManager
-- Purpose: Enable Google sign-in
-- Third-party identity provider
-
-### **SUBSCRIPTION API** - Subscription Management
-- Used by: UserManager
-- Purpose: Track user subscription tier
-- Integration with subscription service
-
-### **AUDIT_LOG** - Audit Logging
-- Used by: All Managers
-- Purpose: Track security events
-- Compliance and security auditing
+| Service | Implementation | Protocol | Used By |
+|---------|---------------|----------|---------|
+| **Password Hashing** | BCrypt (`BCryptPasswordHasher`) | in-process | ASP.NET Identity (AuthController) |
+| **Credential Encryption** | AES-256-GCM (`PasswordEncryptionService`) | in-process | CredentialManager |
+| **2FA / TOTP** | `TwoFactorService` | in-process | AuthController |
+| **Breach Check** | Have I Been Pwned API (`BreachCheckService`) | HTTPS | AuthController |
+| **Email** | `EmailService` | SMTP | SharingManager |
+| **Audit Logging** | `AuditManager` + `sp_LogAudit` stored proc | in-process | All managers |
 
 ---
 
-## Database Layer Details
+## Database Details
 
-### **ApplicationDbContext**
-- Entity Framework Core DbContext
-- Manages all database operations
-- Implements Unit of Work pattern
+### ApplicationDbContext
+- EF Core DbContext; single point of data access for all managers
+- Runs at `READ COMMITTED` isolation level (via `ReadCommittedInterceptor`)
 
-### **Entity Framework Core**
-- ORM (Object-Relational Mapper)
-- Converts LINQ queries to SQL
-- Handles migrations
-
-### **Repository Pattern**
-- Abstracts data access logic
-- Generic repository for CRUD operations
-- Promotes testability
-
-### **Database**
-- PostgreSQL or MySQL
-- 9 core tables (Users, Vaults, Credentials, Tags, Categories, etc.)
-- Cascade deletes, soft deletes, indexing
-
----
-
-## Key Design Patterns
-
-### **Layered Architecture**
-- Clear separation of concerns
-- Each layer has specific responsibilities
-- Easier to test and maintain
-
-### **Manager Pattern (Service Layer)**
-- Business logic encapsulation
-- Handles domain rules
-- Orchestrates data access
-
-### **Repository Pattern**
-- Abstract data access
-- Easier to swap data sources
-- Improved testability
-
-### **Dependency Injection**
-- ASP.NET Core built-in DI container
-- Loose coupling between components
-- Easier testing and mocking
-
-### **OAuth 2.0 + JWT**
-- Stateless authentication
-- Supports multiple identity providers
-- Industry standard security
-
----
-
-## External Integrations
-
-| Service | Purpose | Used By |
-|---------|---------|---------|
-| **Google OAuth** | Social login | AuthManager |
-| **Email Service** | Invitations, notifications | SharingManager, InvitationsController |
-| **Encryption Service** | External encryption provider | CredentialManager |
-| **Subscription API** | Manage user tiers | UserManager |
-| **Swagger/OpenAPI** | API documentation | Development & Testing |
+### MySQL 8.0 artifacts
+- **View**: `vwUserVaultAccess` — vault access queries
+- **Stored Procedures**: `sp_AddVaultShare`, `sp_LogAudit`
+- **Trigger**: `trg_Credentials_SetUpdatedAt` — automatic timestamp updates
+- Soft deletes on Vaults (IsDeleted flag + cascade)
 
 ---
 
@@ -314,51 +213,26 @@
 
 | Layer | Technology |
 |-------|-----------|
-| **Framework** | ASP.NET Core 8.x |
+| **Framework** | ASP.NET Core 10 |
 | **ORM** | Entity Framework Core |
-| **Authentication** | ASP.NET Identity + OAuth 2.0 |
-| **Authorization** | Policy-based authorization |
-| **Encryption** | BCrypt (passwords), AES (data) |
-| **Database** | PostgreSQL / MySQL |
-| **API Docs** | Swagger/OpenAPI |
-| **Logging** | Structured logging (Serilog) |
-
----
-
-## Deployment Architecture (Production)
-
-```
-┌────────────────────────────────────────┐
-│         Load Balancer / CDN            │
-└────────────────┬───────────────────────┘
-                 │
-    ┌────────────┼────────────┐
-    ↓            ↓            ↓
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│  API    │ │  API    │ │  API    │
-│Instance1│ │Instance2│ │Instance3│
-└────┬────┘ └────┬────┘ └────┬────┘
-     │           │           │
-     └───────────┼───────────┘
-                 │
-        ┌────────┴───────┐
-        │                │
-    ┌───▼────┐    ┌──────▼───┐
-    │ Cache  │    │ Database │
-    │(Redis) │    │ Cluster  │
-    └────────┘    └──────────┘
-```
+| **Authentication** | ASP.NET Identity + JWT Bearer |
+| **Authorization** | Permission-claim-based policies |
+| **Password hashing** | BCrypt |
+| **Credential encryption** | AES-256-GCM |
+| **Database** | MySQL 8.0 |
+| **API Docs** | Swagger / OpenAPI |
+| **Logging** | ASP.NET Core built-in logging |
 
 ---
 
 ## Security Considerations
 
-**HTTPS/TLS** - All communications encrypted
-**JWT Tokens** - Stateless authentication
-**Password Hashing** - BCrypt with salt
-**Data Encryption** - AES encryption for sensitive data
-**Authorization Policies** - Fine-grained access control
-**Audit Logging** - All actions tracked
-**2FA/TOTP** - Multi-factor authentication support
-**Soft Deletes** - Data retention for compliance
-**CORS** - Cross-origin request protection
+- **JWT tokens** — stateless authentication; signed with HS256
+- **BCrypt** — password hashing with salt
+- **AES-256-GCM** — authenticated encryption for stored credentials
+- **Authorization policies** — fine-grained permission claims per role
+- **Audit logging** — all security-relevant actions tracked via `sp_LogAudit`
+- **2FA / TOTP** — multi-factor authentication
+- **Soft deletes** — vault data retained after deletion
+- **CORS** — restricted to known frontend origins
+- **Least-privilege DB account** — API uses `passman_app` (not root)
