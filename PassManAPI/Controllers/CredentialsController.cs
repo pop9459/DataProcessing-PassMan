@@ -597,43 +597,4 @@ public class CredentialsController : ControllerBase
         var isShared = await _db.VaultShares.AsNoTracking().AnyAsync(vs => vs.VaultId == vaultId && vs.UserId == currentUserId);
         return isShared;
     }
-
-    public class CreateCredentialRequest
-    {
-        [Required]
-        [MaxLength(255)]
-        public string Title { get; set; } = string.Empty;
-
-        [MaxLength(255)]
-        public string? Username { get; set; }
-
-        [Required]
-        public string EncryptedPassword { get; set; } = string.Empty;
-
-        [MaxLength(500)]
-        [Url]
-        public string? Url { get; set; }
-
-        public string? Notes { get; set; }
-
-        public int? CategoryId { get; set; }
-    }
-
-    public class UpdateCredentialRequest
-    {
-        [Required]
-        [MaxLength(255)]
-        public string Title { get; set; } = string.Empty;
-
-        [MaxLength(255)]
-        public string? Username { get; set; }
-
-        [MaxLength(500)]
-        [Url]
-        public string? Url { get; set; }
-
-        public string? Notes { get; set; }
-
-        public int? CategoryId { get; set; }
-    }
 }
