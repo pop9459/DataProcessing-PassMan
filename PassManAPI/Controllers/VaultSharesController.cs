@@ -138,7 +138,7 @@ public class VaultSharesController : ControllerBase
                     AccessType = "Shared"
                 }).ToListAsync();
 
-            accessible = owned.Concat(shared);
+            accessible = owned.Concat(shared).ToList();
         }
 
         return Ok(accessible);
