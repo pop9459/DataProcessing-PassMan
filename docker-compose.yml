@@ -12,6 +12,9 @@ services:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=passman_app;Password=${DB_APP_PASSWORD:-passman_app_dev_pw};Pooling=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-32chars}
+      # Google OAuth client id. The API validates that incoming Google id tokens were issued for
+      # this client (audience check), so it must be configured server-side, not only on the GUI.
+      - Authentication__Google__ClientId=${GOOGLE_CLIENT_ID}
       # Suppress verbose EF Core SQL query logs — use Warning to keep errors visible
       - Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command=Warning
     command: dotnet watch --project PassManAPI.csproj run --urls http://0.0.0.0:8080
