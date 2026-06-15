@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Models;
 
 namespace PassManAPI.Controllers;
@@ -35,9 +35,9 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<IEnumerable<TagDto>>> GetTags()
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var tags = await _db.Tags
@@ -66,20 +66,20 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TagDto>> GetTag(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var tag = await _db.Tags.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
         if (tag is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Tag not found.");
         }
 
         if (tag.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         return Ok(new TagDto(tag.Id, tag.Name));
@@ -104,9 +104,9 @@ public class TagsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var trimmedName = request.Name.Trim();
@@ -116,15 +116,24 @@ public class TagsController : ControllerBase
             .AnyAsync(t => t.UserId == currentUserId && t.Name.ToLower() == trimmedName.ToLower());
         if (duplicate)
         {
-            return BadRequest($"A tag with name '{trimmedName}' already exists.");
+            return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
         }
 
         var tag = new Tag(trimmedName, currentUserId);
 
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // The Tags.Name unique index can be violated by a name another user already holds,
+            // which the per-user pre-check above cannot see. Return a clean 400 instead of a 500.
+            return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
+        }
 
-        await LogAudit(AuditAction.TagCreated, currentUserId, nameof(Tag), tag.Id, $"Tag '{tag.Name}' created");
+        await _db.AddAuditLogAsync(AuditAction.TagCreated, currentUserId, nameof(Tag), tag.Id, $"Tag '{tag.Name}' created");
 
         var response = new TagDto(tag.Id, tag.Name);
         return CreatedAtAction(nameof(GetTag), new { id = tag.Id }, response);
@@ -154,20 +163,20 @@ public class TagsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var tag = await _db.Tags.FirstOrDefaultAsync(t => t.Id == id);
         if (tag is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Tag not found.");
         }
 
         if (tag.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var trimmedName = request.Name.Trim();
@@ -177,14 +186,21 @@ public class TagsController : ControllerBase
             .AnyAsync(t => t.UserId == currentUserId && t.Id != id && t.Name.ToLower() == trimmedName.ToLower());
         if (duplicate)
         {
-            return BadRequest($"A tag with name '{trimmedName}' already exists.");
+            return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
         }
 
         var oldName = tag.Name;
         tag.Rename(trimmedName);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return this.BadRequestProblem($"A tag with name '{trimmedName}' already exists.");
+        }
 
-        await LogAudit(AuditAction.TagUpdated, currentUserId, nameof(Tag), tag.Id, $"Tag renamed from '{oldName}' to '{tag.Name}'");
+        await _db.AddAuditLogAsync(AuditAction.TagUpdated, currentUserId, nameof(Tag), tag.Id, $"Tag renamed from '{oldName}' to '{tag.Name}'");
 
         return Ok(new TagDto(tag.Id, tag.Name));
     }
@@ -205,9 +221,9 @@ public class TagsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTag(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var tag = await _db.Tags
@@ -215,12 +231,12 @@ public class TagsController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == id);
         if (tag is null)
         {
-            return NotFound();
+            return this.NotFoundProblem("Tag not found.");
         }
 
         if (tag.UserId != currentUserId)
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var tagName = tag.Name;
@@ -230,29 +246,9 @@ public class TagsController : ControllerBase
         _db.Tags.Remove(tag);
         await _db.SaveChangesAsync();
 
-        await LogAudit(AuditAction.TagDeleted, currentUserId, nameof(Tag), id, $"Tag '{tagName}' deleted");
+        await _db.AddAuditLogAsync(AuditAction.TagDeleted, currentUserId, nameof(Tag), id, $"Tag '{tagName}' deleted");
 
         return NoContent();
     }
 
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
-
-    private async Task LogAudit(AuditAction action, int userId, string? entityType, int? entityId, string? details)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = entityType,
-            EntityId = entityId,
-            Details = details,
-            UserId = userId,
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
-    }
 }

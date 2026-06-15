@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net;
-using System.Text.Json;
 using PassManAPI.DTOs;
 
 namespace PassManAPI.Middleware;
@@ -75,16 +74,8 @@ public class ExceptionHandlerMiddleware
             _ => CreateInternalServerError(exception, traceId)
         };
 
-        context.Response.ContentType = "application/problem+json";
-        context.Response.StatusCode = response.Status;
-
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        };
-
-        await context.Response.WriteAsJsonAsync(response, options);
+        // Content-negotiated (XML or JSON) so error bodies are available in both formats.
+        await ErrorResponseWriter.WriteAsync(context, response);
     }
 
     private ErrorResponse CreateInternalServerError(Exception exception, string traceId)

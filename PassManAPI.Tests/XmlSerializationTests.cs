@@ -203,6 +203,57 @@ public class XmlSerializationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Controller_Error_Should_Serialize_As_XML_When_Accept_Is_XML()
+    {
+        // A controller-returned error (404 "Vault not found." from CredentialsController) must
+        // content-negotiate to XML — previously the helper forced application/problem+json.
+        var user = await RegisterAsync($"xml-err-{Guid.NewGuid()}@test.local");
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/vaults/999999/credentials");
+        request.Headers.Add("X-UserId", user.User.Id.ToString());
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+
+        var xml = XDocument.Parse(await response.Content.ReadAsStringAsync());
+        xml.Root!.Name.LocalName.Should().Be("ErrorResponse");
+        xml.Root.Element("Detail")!.Value.Should().Contain("Vault not found");
+    }
+
+    [Fact]
+    public async Task Middleware_Unauthorized_Should_Serialize_As_XML_When_Accept_Is_XML()
+    {
+        // A 401 produced by the auth pipeline (no controller body) must also be available as XML.
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+
+        var xml = XDocument.Parse(await response.Content.ReadAsStringAsync());
+        xml.Root!.Name.LocalName.Should().Be("ErrorResponse");
+        xml.Root.Element("Status")!.Value.Should().Be("401");
+    }
+
+    [Fact]
+    public async Task Error_Should_Default_To_Json_When_Xml_Not_Requested()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Content.Headers.ContentType?.MediaType.Should().Contain("json");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("\"status\":401");
+    }
+
+    [Fact]
     public async Task JSON_Should_Still_Work_When_XML_Is_Enabled()
     {
         // Arrange
@@ -225,6 +276,128 @@ public class XmlSerializationTests : IClassFixture<TestWebApplicationFactory>
         var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
         payload.Should().NotBeNull();
         payload!.User.Email.Should().Be(registerRequest.Email);
+    }
+
+    [Fact]
+    public async Task GetTags_Should_Return_XML_When_Accept_Is_XML()
+    {
+        // Covers the record->class fix for TagDto (positional records aren't XmlSerializable).
+        var user = await RegisterAsync($"tags-xml-{Guid.NewGuid()}@test.local");
+
+        var create = new HttpRequestMessage(HttpMethod.Post, "/api/tags")
+        {
+            Content = JsonContent.Create(new { name = "xml-tag" })
+        };
+        create.Headers.Add("X-UserId", user.User.Id.ToString());
+        (await _client.SendAsync(create)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/tags");
+        req.Headers.Add("X-UserId", user.User.Id.ToString());
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var resp = await _client.SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        var body = await resp.Content.ReadAsStringAsync();
+        XDocument.Parse(body).Root!.Name.LocalName.Should().Be("ArrayOfTagDto");
+        body.Should().Contain("<Name>xml-tag</Name>");
+    }
+
+    [Fact]
+    public async Task Credentials_List_And_Password_Should_Return_XML_When_Accept_Is_XML()
+    {
+        // Covers the anonymous-type -> named-DTO fix (CredentialListItemDto, PasswordResponse).
+        var user = await RegisterAsync($"creds-xml-{Guid.NewGuid()}@test.local");
+
+        var vReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "xml-vault", userId = user.User.Id })
+        };
+        vReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultId = (await (await _client.SendAsync(vReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var cReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultId}/credentials")
+        {
+            Content = JsonContent.Create(new { title = "xml-cred", encryptedPassword = "secret" })
+        };
+        cReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credId = (await (await _client.SendAsync(cReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var listReq = new HttpRequestMessage(HttpMethod.Get, $"/api/vaults/{vaultId}/credentials");
+        listReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        listReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var listResp = await _client.SendAsync(listReq);
+        listResp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        XDocument.Parse(await listResp.Content.ReadAsStringAsync())
+            .Root!.Name.LocalName.Should().Be("ArrayOfCredentialListItemDto");
+
+        var pwReq = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{credId}/password");
+        pwReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        pwReq.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var pwResp = await _client.SendAsync(pwReq);
+        pwResp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        var pwBody = await pwResp.Content.ReadAsStringAsync();
+        XDocument.Parse(pwBody).Root!.Name.LocalName.Should().Be("PasswordResponse");
+        pwBody.Should().Contain("<Password>secret</Password>");
+    }
+
+    [Fact]
+    public async Task GetCredentialById_Should_Return_XML_When_Accept_Is_XML()
+    {
+        var user = await RegisterAsync($"credbyid-xml-{Guid.NewGuid()}@test.local");
+
+        var vReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "credbyid-vault", userId = user.User.Id })
+        };
+        vReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var vaultId = (await (await _client.SendAsync(vReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var cReq = new HttpRequestMessage(HttpMethod.Post, $"/api/vaults/{vaultId}/credentials")
+        {
+            Content = JsonContent.Create(new { title = "xml-detail-cred", encryptedPassword = "pw", notes = "my notes" })
+        };
+        cReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        var credId = (await (await _client.SendAsync(cReq)).Content.ReadFromJsonAsync<CreatedVaultResponse>())!.Id;
+
+        var req = new HttpRequestMessage(HttpMethod.Get, $"/api/credentials/{credId}");
+        req.Headers.Add("X-UserId", user.User.Id.ToString());
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var resp = await _client.SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        var body = await resp.Content.ReadAsStringAsync();
+        var xml = XDocument.Parse(body);
+        xml.Root!.Name.LocalName.Should().Be("CredentialDto");
+        xml.Root.Element("Title")!.Value.Should().Be("xml-detail-cred");
+        xml.Root.Element("Notes")!.Value.Should().Be("my notes");
+        xml.Root.Element("VaultId")!.Value.Should().Be(vaultId.ToString());
+    }
+
+    [Fact]
+    public async Task AuditLogs_Should_Return_XML_When_Accept_Is_XML()
+    {
+        // Covers the IEnumerable -> List fix on PaginatedAuditResult.Items.
+        var user = await RegisterAsync($"audit-xml-{Guid.NewGuid()}@test.local");
+
+        // Creating a vault writes an audit log entry for this user.
+        var vReq = new HttpRequestMessage(HttpMethod.Post, "/api/vaults")
+        {
+            Content = JsonContent.Create(new { name = "audit-vault", userId = user.User.Id })
+        };
+        vReq.Headers.Add("X-UserId", user.User.Id.ToString());
+        (await _client.SendAsync(vReq)).EnsureSuccessStatusCode();
+
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/audit/logs");
+        req.Headers.Add("X-UserId", user.User.Id.ToString());
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        var resp = await _client.SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Content.Headers.ContentType?.MediaType.Should().Be("application/xml");
+        XDocument.Parse(await resp.Content.ReadAsStringAsync())
+            .Root!.Name.LocalName.Should().Be("PaginatedAuditResult");
     }
 
     private async Task<AuthResponse> RegisterAsync(string email)

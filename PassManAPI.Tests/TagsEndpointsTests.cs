@@ -106,6 +106,32 @@ public class TagsEndpointsTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Duplicate_Tag_Name_Across_Users_Returns_400_Not_500()
+    {
+        // Regression test for #163: the Tags.Name unique index is global, but the controller's
+        // duplicate pre-check is per-user, so a name another user already holds used to surface
+        // as a 500 (DbUpdateException). It must now be a clean 400.
+        var userA = await RegisterAsync("tags-crossuser-a@test.local");
+        var userB = await RegisterAsync("tags-crossuser-b@test.local");
+
+        var reqA = new HttpRequestMessage(HttpMethod.Post, "/api/tags")
+        {
+            Content = JsonContent.Create(new CreateTagRequest { Name = "SharedName" })
+        };
+        reqA.Headers.Add("X-UserId", userA.User.Id.ToString());
+        (await _client.SendAsync(reqA)).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var reqB = new HttpRequestMessage(HttpMethod.Post, "/api/tags")
+        {
+            Content = JsonContent.Create(new CreateTagRequest { Name = "SharedName" })
+        };
+        reqB.Headers.Add("X-UserId", userB.User.Id.ToString());
+        var respB = await _client.SendAsync(reqB);
+
+        respB.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Users_Cannot_See_Or_Modify_Others_Tags()
     {
         var owner = await RegisterAsync("tag-owner-2@test.local");

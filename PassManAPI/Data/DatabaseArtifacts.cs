@@ -34,6 +34,7 @@ SELECT v.Id AS VaultId,
        v.UserId AS AccessUserId,
        'Owner' AS AccessType
   FROM Vaults v
+ WHERE v.IsDeleted = 0
 UNION
 SELECT vs.VaultId,
        v.Name AS VaultName,
@@ -41,7 +42,8 @@ SELECT vs.VaultId,
        vs.UserId AS AccessUserId,
        'Shared' AS AccessType
   FROM VaultShares vs
-  JOIN Vaults v ON v.Id = vs.VaultId;";
+  JOIN Vaults v ON v.Id = vs.VaultId
+ WHERE v.IsDeleted = 0;";
             await ExecuteAsync(conn, tx, createView);
 
             // Stored procedure: add vault share by email with validation and idempotency
@@ -55,12 +57,14 @@ BEGIN
     IF vOwnerId IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Vault not found';
     END IF;
-    SELECT Id INTO vUserId FROM Users WHERE Email = pUserEmail;
+    -- ASP.NET Identity stores users in AspNetUsers, not a plain Users table
+    SELECT Id INTO vUserId FROM AspNetUsers WHERE Email = pUserEmail;
     IF vUserId IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'User not found';
     END IF;
     IF vOwnerId <> vUserId THEN
-        INSERT IGNORE INTO VaultShares (VaultId, UserId) VALUES (pVaultId, vUserId);
+        INSERT IGNORE INTO VaultShares (VaultId, UserId, Permission, SharedAt)
+        VALUES (pVaultId, vUserId, 0, CURRENT_TIMESTAMP);
     END IF;
 END;";
             await ExecuteAsync(conn, tx, dropSpShare);
@@ -76,10 +80,12 @@ CREATE PROCEDURE sp_LogAudit(
     IN pEntityId INT,
     IN pDetails TEXT,
     IN pIp VARCHAR(45),
-    IN pUserAgent VARCHAR(500))
+    IN pUserAgent VARCHAR(500),
+    IN pVaultId INT,
+    IN pCredentialId INT)
 BEGIN
-    INSERT INTO AuditLogs (Action, EntityType, EntityId, Details, UserId, IpAddress, UserAgent, Timestamp)
-    VALUES (pAction, pEntityType, pEntityId, pDetails, pUserId, pIp, pUserAgent, CURRENT_TIMESTAMP);
+    INSERT INTO AuditLogs (Action, EntityType, EntityId, Details, UserId, IpAddress, UserAgent, Timestamp, VaultId, CredentialId)
+    VALUES (pAction, pEntityType, pEntityId, pDetails, pUserId, pIp, pUserAgent, CURRENT_TIMESTAMP, pVaultId, pCredentialId);
 END;";
             await ExecuteAsync(conn, tx, dropSpAudit);
             await ExecuteAsync(conn, tx, createSpAudit);

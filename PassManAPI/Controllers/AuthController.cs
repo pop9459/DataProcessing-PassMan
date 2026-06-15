@@ -6,6 +6,7 @@ using PassManAPI.Data;
 using PassManAPI.DTOs;
 using PassManAPI.Models;
 using PassManAPI.Managers;
+using PassManAPI.Helpers;
 using PassManAPI.Services;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
@@ -73,27 +74,23 @@ public class AuthController : ControllerBase
 
         if (!result.Success || result.Data is null)
         {
-            return BadRequest(result.Error ?? "Registration failed.");
+            return this.BadRequestProblem(result.Error ?? "Registration failed.");
         }
 
         // Assign default role so authorization policies can be exercised.
         var identityUser = await _identityUserManager.FindByIdAsync(result.Data.Id.ToString());
         if (identityUser is null)
         {
-            return BadRequest("User not found after creation.");
+            return this.BadRequestProblem("User not found after creation.");
         }
 
         var roleResult = await AddUserToRoleAsync(identityUser, DefaultRole);
         if (!roleResult.Succeeded)
         {
-            return BadRequest(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+            return this.BadRequestProblem(string.Join(", ", roleResult.Errors.Select(e => e.Description)));
         }
 
-        var token = _jwtTokenService.CreateAccessToken(
-            result.Data.Id,
-            result.Data.Email,
-            result.Data.UserName
-        );
+        var token = await _jwtTokenService.CreateAccessTokenAsync(identityUser);
         var response = new AuthResponse
         {
             AccessToken = token,
@@ -120,12 +117,12 @@ public class AuthController : ControllerBase
         var user = await _identityUserManager.FindByEmailAsync(email);
         if (user is null)
         {
-            return Unauthorized("Invalid credentials.");
+            return this.UnauthorizedProblem("Invalid credentials.");
         }
 
         if (!await _identityUserManager.IsEmailConfirmedAsync(user))
         {
-            return Unauthorized("Email not confirmed.");
+            return this.UnauthorizedProblem("Email not confirmed.");
         }
 
         var signInResult = await _signInManager.CheckPasswordSignInAsync(
@@ -136,18 +133,18 @@ public class AuthController : ControllerBase
 
         if (signInResult.IsLockedOut)
         {
-            return StatusCode(StatusCodes.Status423Locked, "Account is locked. Try again later.");
+            return this.LockedProblem("Account is locked. Try again later.");
         }
 
         if (!signInResult.Succeeded)
         {
-            return Unauthorized("Invalid credentials.");
+            return this.UnauthorizedProblem("Invalid credentials.");
         }
 
         user.LastLoginAt = DateTime.UtcNow;
         await _identityUserManager.UpdateAsync(user);
 
-        var token = _jwtTokenService.CreateAccessToken(user);
+        var token = await _jwtTokenService.CreateAccessTokenAsync(user);
         return Ok(new AuthResponse
         {
             AccessToken = token,
@@ -207,7 +204,7 @@ public class AuthController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            var token = _jwtTokenService.CreateAccessToken(user);
+            var token = await _jwtTokenService.CreateAccessTokenAsync(user);
             return Ok(new AuthResponse
             {
                 AccessToken = token,
@@ -215,13 +212,13 @@ public class AuthController : ControllerBase
             });
 
         }
-        catch (InvalidJwtException ex)
+        catch (InvalidJwtException)
         {
-             return BadRequest($"Invalid Google Token: {ex.Message}");
+            return this.BadRequestProblem("Invalid Google token.");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-             return BadRequest($"Google Login Failed: {ex.Message}");
+            return this.BadRequestProblem("Google authentication failed.");
         }
     }
 
@@ -237,14 +234,14 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _userManager.GetUserByIdAsync(userId.Value);
         if (!result.Success || result.Data is null)
         {
             // User no longer exists - their token is no longer valid
-            return Unauthorized("User not found or token invalid.");
+            return this.UnauthorizedProblem("User not found or token invalid.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -265,7 +262,7 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         if (!ModelState.IsValid)
@@ -285,7 +282,7 @@ public class AuthController : ControllerBase
 
         if (!result.Success || result.Data is null)
         {
-            return BadRequest(result.Error ?? "Update failed.");
+            return this.BadRequestProblem(result.Error ?? "Update failed.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -303,13 +300,13 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var result = await _userManager.DeleteUserAsync(userId.Value);
         if (!result.Success)
         {
-            return NotFound(result.Error ?? "User not found.");
+            return this.NotFoundProblem(result.Error ?? "User not found.");
         }
 
         return NoContent();
@@ -368,13 +365,13 @@ public class AuthController : ControllerBase
         var userId = GetUserId();
         if (userId is null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         var identityUser = await _identityUserManager.FindByIdAsync(userId.Value.ToString());
         if (identityUser == null)
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem("User not found or token invalid.");
         }
 
         var roles = await _identityUserManager.GetRolesAsync(identityUser);
@@ -409,13 +406,13 @@ public class AuthController : ControllerBase
         var identityUser = await _identityUserManager.FindByIdAsync(request.UserId.ToString());
         if (identityUser == null)
         {
-            return NotFound("User not found.");
+            return this.NotFoundProblem("User not found.");
         }
 
         var role = await _roleManager.FindByNameAsync(request.RoleName);
         if (role == null)
         {
-            return BadRequest($"Role '{request.RoleName}' does not exist.");
+            return this.BadRequestProblem($"Role '{request.RoleName}' does not exist.");
         }
 
         // Remove existing roles before assigning the new one
@@ -428,10 +425,10 @@ public class AuthController : ControllerBase
         var result = await AddUserToRoleAsync(identityUser, request.RoleName);
         if (!result.Succeeded)
         {
-            return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
+            return this.BadRequestProblem(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        return Ok(new { Message = $"User assigned to role '{request.RoleName}' successfully." });
+        return Ok(new MessageResponse { Message = $"User assigned to role '{request.RoleName}' successfully." });
     }
 
     /// <summary>

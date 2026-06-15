@@ -1,9 +1,9 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.DTOs;
+using PassManAPI.Helpers;
 using PassManAPI.Managers;
 using PassManAPI.Models;
 
@@ -43,7 +43,8 @@ public class UserController : ControllerBase
             .OrderBy(u => u.Email)
             .ToListAsync();
 
-        var response = users.Select(ToProfile);
+        // Materialize to a List so XmlSerializer can serialize it (it can't serialize a lazy IEnumerable).
+        var response = users.Select(ToProfile).ToList();
         return Ok(response);
     }
 
@@ -60,21 +61,21 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserProfileResponse>> GetUser(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own profile, or admins can view any profile
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var result = await _userManager.GetUserByIdAsync(id);
         if (!result.Success || result.Data is null)
         {
-            return NotFound(result.Error ?? "User not found.");
+            return this.NotFoundProblem(result.Error ?? "User not found.");
         }
 
         return Ok(ToProfile(result.Data));
@@ -96,15 +97,15 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UserProfileResponse>> UpdateUser(int id, [FromBody] UpdateProfileRequest request)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can update their own profile, or admins can update any profile
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var updateRequest = new UpdateUserRequest(
@@ -119,12 +120,12 @@ public class UserController : ControllerBase
         {
             if (result.Error?.Contains("not found") == true)
             {
-                return NotFound(result.Error);
+                return this.NotFoundProblem(result.Error ?? "User not found.");
             }
-            return BadRequest(result.Error ?? "Update failed.");
+            return this.BadRequestProblem(result.Error ?? "Update failed.");
         }
 
-        await LogAuditAsync(AuditAction.UserPasswordChanged, currentUserId, id, "Profile updated");
+        await _db.AddAuditLogAsync(AuditAction.UserPasswordChanged, currentUserId, "User", id, "Profile updated");
         return Ok(ToProfile(result.Data));
     }
 
@@ -141,21 +142,21 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can delete their own account, or admins can delete any account
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var result = await _userManager.DeleteUserAsync(id);
         if (!result.Success)
         {
-            return NotFound(result.Error ?? "User not found.");
+            return this.NotFoundProblem(result.Error ?? "User not found.");
         }
 
         return NoContent();
@@ -174,21 +175,21 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<VaultSummaryDto>>> GetUserVaults(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own vaults, or admins can view any user's vaults
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var userExists = await _db.Users.AnyAsync(u => u.Id == id);
         if (!userExists)
         {
-            return NotFound("User not found.");
+            return this.NotFoundProblem("User not found.");
         }
 
         var vaults = await _db.Vaults
@@ -213,21 +214,21 @@ public class UserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<TagDto>>> GetUserTags(int id)
     {
-        if (!TryGetCurrentUserId(out var currentUserId))
+        if (!User.TryGetCurrentUserId(out var currentUserId))
         {
-            return Unauthorized();
+            return this.UnauthorizedProblem();
         }
 
         // Users can view their own tags, or admins can view any user's tags
-        if (currentUserId != id && !HasPermission(PermissionConstants.UserManage))
+        if (currentUserId != id && !User.HasPermission(PermissionConstants.UserManage))
         {
-            return Forbid();
+            return this.ForbiddenProblem();
         }
 
         var userExists = await _db.Users.AnyAsync(u => u.Id == id);
         if (!userExists)
         {
-            return NotFound("User not found.");
+            return this.NotFoundProblem("User not found.");
         }
 
         var tags = await _db.Tags
@@ -237,33 +238,6 @@ public class UserController : ControllerBase
             .ToListAsync();
 
         return Ok(tags);
-    }
-
-    // Helper methods
-    private bool TryGetCurrentUserId(out int userId)
-    {
-        userId = 0;
-        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-        return claim != null && int.TryParse(claim.Value, out userId);
-    }
-
-    private bool HasPermission(string permission)
-    {
-        return User.Claims.Any(c => c.Type == PermissionConstants.ClaimType && c.Value == permission);
-    }
-
-    private async Task LogAuditAsync(AuditAction action, int actorUserId, int targetUserId, string? details = null)
-    {
-        _db.AuditLogs.Add(new AuditLog
-        {
-            Action = action,
-            EntityType = "User",
-            EntityId = targetUserId,
-            UserId = actorUserId,
-            Details = details ?? $"User {actorUserId} performed {action} on user {targetUserId}",
-            Timestamp = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync();
     }
 
     private static UserProfileResponse ToProfile(User user) =>
@@ -296,6 +270,23 @@ public class UserController : ControllerBase
 }
 
 /// <summary>
-/// Summary DTO for vault information in user context.
+/// Summary DTO for vault information in user context. A class with a parameterless constructor so
+/// it is XML-serializable; the positional constructor keeps the EF projection working.
 /// </summary>
-public record VaultSummaryDto(int Id, string Name, string? Description, DateTime CreatedAt);
+public class VaultSummaryDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public VaultSummaryDto() { }
+
+    public VaultSummaryDto(int id, string name, string? description, DateTime createdAt)
+    {
+        Id = id;
+        Name = name;
+        Description = description;
+        CreatedAt = createdAt;
+    }
+}
