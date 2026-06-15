@@ -4,8 +4,7 @@
     "name": "PassManAPI - Full Endpoint Coverage Copy 9",
     "description": "Comprehensive collection: positive and negative tests for Auth (expanded), Vaults, Credentials, Tags, Invitations, Audit. Run against Docker-local API at {{baseUrl}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "53985542",
-    "_collection_link": "https://go.postman.co/collection/53985542-e2c97322-c45f-483f-b90d-f0c8b32a2fd3?source=collection_link"
+    "_exporter_id": "53985542"
   },
   "event": [
     {

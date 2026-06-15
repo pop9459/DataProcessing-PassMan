@@ -12,6 +12,8 @@ services:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - ConnectionStrings__DefaultConnection=Server=db;Port=3306;Database=passManDB;User=passman_app;Password=${DB_APP_PASSWORD:-passman_app_dev_pw};Pooling=true
       - Jwt__SigningKey=${JWT_SIGNING_KEY:-dev-only-signing-key-change-me-32chars}
+      # Suppress verbose EF Core SQL query logs — use Warning to keep errors visible
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command=Warning
     command: dotnet watch --project PassManAPI.csproj run --urls http://0.0.0.0:8080
     volumes:
       - ./PassManAPI:/app
@@ -21,6 +23,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
 
   passman-gui:
     build:
@@ -62,6 +70,23 @@ services:
     command: test PassManAPI.Tests/PassManAPI.Tests.csproj --logger "console;verbosity=detailed"
     profiles:
       - test
+
+  # E2E test runner — run with: docker compose --profile e2e up --abort-on-container-exit
+  # Uses the Docker-internal URL (passman-api:8080) so no port mapping needed.
+  # The collection's baseUrl collection variable (http://localhost:5246) is overridden at runtime.
+  newman:
+    image: postman/newman:alpine
+    volumes:
+      - ./scripts:/etc/newman
+    command: >
+      run PASSMAN-tests.postman_collection.json
+      --env-var "baseUrl=http://passman-api:8080"
+      --reporters cli
+    depends_on:
+      passman-api:
+        condition: service_healthy
+    profiles:
+      - e2e
 
   db:
    image: mysql:8.0
