@@ -68,6 +68,7 @@ namespace PassManAPI.Data
             // IgnoreQueryFilters where it deliberately needs deleted vaults.
             modelBuilder.Entity<Credential>().HasQueryFilter(c => !c.Vault.IsDeleted);
             modelBuilder.Entity<VaultShare>().HasQueryFilter(vs => !vs.Vault.IsDeleted);
+            modelBuilder.Entity<Invitation>().HasQueryFilter(i => !i.Vault.IsDeleted);
 
             // Credential configurations
             modelBuilder
