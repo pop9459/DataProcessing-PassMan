@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
@@ -14,9 +15,11 @@ namespace PassManAPI.Controllers;
 public class VaultSharesController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    public VaultSharesController(ApplicationDbContext db)
+    private readonly ILookupNormalizer _normalizer;
+    public VaultSharesController(ApplicationDbContext db, ILookupNormalizer normalizer)
     {
         _db = db;
+        _normalizer = normalizer;
     }
 
     /// <summary>
@@ -59,7 +62,10 @@ public class VaultSharesController : ControllerBase
             return this.ForbiddenProblem();
         }
 
-        var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.UserEmail);
+        // Resolve by normalized email so the match is case-insensitive and provider-independent,
+        // consistent with how users are looked up everywhere else (UserManager, Google login).
+        var normalizedEmail = _normalizer.NormalizeEmail(request.UserEmail) ?? request.UserEmail.ToUpperInvariant();
+        var targetUser = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
         if (targetUser is null)
         {
             return this.NotFoundProblem("Target user not found.");
@@ -67,12 +73,13 @@ public class VaultSharesController : ControllerBase
 
         if (_db.Database.IsMySql())
         {
-            // On MySQL: delegate to sp_AddVaultShare. The procedure resolves the user by email,
-            // validates vault ownership, and uses INSERT IGNORE for idempotency.
+            // On MySQL: delegate to sp_AddVaultShare. Pass the canonical stored email so the
+            // procedure resolves the same user the controller validated above. The procedure
+            // validates vault ownership and uses INSERT IGNORE for idempotency.
             await _db.Database.ExecuteSqlRawAsync(
                 "CALL sp_AddVaultShare({0}, {1})",
                 vaultId,
-                request.UserEmail);
+                targetUser.Email!);
         }
         else
         {
