@@ -28,6 +28,7 @@ public class AuthController : ControllerBase
     private readonly IJwtTokenService _jwtTokenService;
     private readonly RoleManager<IdentityRole<int>> _roleManager;
     private readonly ILookupNormalizer _normalizer;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         ApplicationDbContext db,
@@ -36,7 +37,8 @@ public class AuthController : ControllerBase
         SignInManager<User> signInManager,
         IJwtTokenService jwtTokenService,
         RoleManager<IdentityRole<int>> roleManager,
-        ILookupNormalizer normalizer
+        ILookupNormalizer normalizer,
+        IConfiguration configuration
     )
     {
         _db = db;
@@ -46,6 +48,7 @@ public class AuthController : ControllerBase
         _jwtTokenService = jwtTokenService;
         _roleManager = roleManager;
         _normalizer = normalizer;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -161,11 +164,20 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
     {
+        // Bind the token to THIS application: the audience ("aud") must be our own Google
+        // client id. Without this, any validly-signed Google id token issued for any other
+        // OAuth client could be replayed here to impersonate the user it names.
+        var googleClientId = _configuration["Authentication:Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(googleClientId))
+        {
+            return this.BadRequestProblem("Google login is not configured.");
+        }
+
         try
         {
             var settings = new GoogleJsonWebSignature.ValidationSettings()
             {
-               // Audience = new List<string> { "<YOUR_CLIENT_ID>" } // For production security
+                Audience = new[] { googleClientId }
             };
 
             var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);

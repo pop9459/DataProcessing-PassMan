@@ -113,7 +113,9 @@ namespace PassManAPI.Controllers
             {
                 Id = i.Id,
                 VaultId = i.VaultId,
-                VaultName = i.Vault.Name,
+                // i.Vault is excluded by the soft-delete query filter for deleted vaults; guard
+                // anyway so a missing navigation can never NRE this projection.
+                VaultName = i.Vault?.Name ?? string.Empty,
                 InvitedEmail = i.InvitedEmail,
                 Role = i.Role.ToString(),
                 Status = "Pending",

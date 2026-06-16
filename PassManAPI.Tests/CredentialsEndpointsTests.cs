@@ -393,6 +393,70 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
         passwordPayload!.Password.Should().Be(newPassword);
     }
 
+    [Fact]
+    public async Task View_Share_Allows_Read_But_Forbids_Modify()
+    {
+        var owner = await RegisterAsync("view-share-owner@test.local");
+        // Collaborator keeps the default VaultOwner role, so the credential.* authorization
+        // policies pass — the only thing standing between them and a write is their share level.
+        var collaborator = await RegisterAsync("view-share-collab@test.local");
+
+        var vault = await CreateVaultAsync(owner, "View Share Vault");
+        var credId = await CreateCredentialAsync(owner, vault.Id, "Secret", "s3cr3t!");
+
+        // Sharing grants View (the default) — read-only.
+        await ShareVaultAsync(owner, vault.Id, collaborator);
+
+        // Reads are allowed for a View share.
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/vaults/{vault.Id}/credentials", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/credentials/{credId}", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/credentials/{credId}/password", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Every mutation is forbidden for a View share, even though the role grants credential.*.
+        var create = Authed(HttpMethod.Post, $"/api/vaults/{vault.Id}/credentials", collaborator);
+        create.Content = JsonContent.Create(new { Title = "Nope", EncryptedPassword = "x" });
+        (await _client.SendAsync(create)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var update = Authed(HttpMethod.Put, $"/api/credentials/{credId}", collaborator);
+        update.Content = JsonContent.Create(new { Title = "Hacked" });
+        (await _client.SendAsync(update)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var updatePw = Authed(HttpMethod.Put, $"/api/credentials/{credId}/password", collaborator);
+        updatePw.Content = JsonContent.Create(new { EncryptedPassword = "pwned" });
+        (await _client.SendAsync(updatePw)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await _client.SendAsync(Authed(HttpMethod.Delete, $"/api/credentials/{credId}", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task SoftDeleted_Vault_Hides_Credentials_From_Sharee()
+    {
+        var owner = await RegisterAsync("softdel-owner@test.local");
+        var collaborator = await RegisterAsync("softdel-collab@test.local");
+
+        var vault = await CreateVaultAsync(owner, "SoftDelete Vault");
+        var credId = await CreateCredentialAsync(owner, vault.Id, "Secret", "s3cr3t!");
+        await ShareVaultAsync(owner, vault.Id, collaborator);
+
+        // Sanity: the sharee can read it before deletion.
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/vaults/{vault.Id}/credentials", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Owner soft-deletes the vault.
+        (await _client.SendAsync(Authed(HttpMethod.Delete, $"/api/vaults/{vault.Id}", owner)))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // The sharee can no longer reach the "deleted" vault's credentials (list or by id).
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/vaults/{vault.Id}/credentials", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await _client.SendAsync(Authed(HttpMethod.Get, $"/api/credentials/{credId}", collaborator)))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private async Task<AuthResponse> LoginAsync(string email, string password)
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
@@ -420,6 +484,39 @@ public class CredentialsEndpointsTests : IClassFixture<TestWebApplicationFactory
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<AuthResponse>();
         return payload!;
+    }
+
+    private HttpRequestMessage Authed(HttpMethod method, string url, AuthResponse user)
+    {
+        var req = new HttpRequestMessage(method, url);
+        req.Headers.Add("X-UserId", user.User.Id.ToString());
+        return req;
+    }
+
+    private async Task<CreatedVaultResponse> CreateVaultAsync(AuthResponse owner, string name)
+    {
+        var req = Authed(HttpMethod.Post, "/api/vaults", owner);
+        req.Content = JsonContent.Create(new { name, description = name, userId = owner.User.Id });
+        var resp = await _client.SendAsync(req);
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        return (await resp.Content.ReadFromJsonAsync<CreatedVaultResponse>())!;
+    }
+
+    private async Task<int> CreateCredentialAsync(AuthResponse owner, int vaultId, string title, string password)
+    {
+        var req = Authed(HttpMethod.Post, $"/api/vaults/{vaultId}/credentials", owner);
+        req.Content = JsonContent.Create(new { Title = title, EncryptedPassword = password });
+        var resp = await _client.SendAsync(req);
+        resp.StatusCode.Should().Be(HttpStatusCode.Created);
+        return (await resp.Content.ReadFromJsonAsync<IdResponse>())!.Id;
+    }
+
+    private async Task ShareVaultAsync(AuthResponse owner, int vaultId, AuthResponse target)
+    {
+        var req = Authed(HttpMethod.Post, $"/api/vaults/{vaultId}/share", owner);
+        req.Content = JsonContent.Create(new { userEmail = target.User.Email });
+        var resp = await _client.SendAsync(req);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private record CreatedVaultResponse(int Id);

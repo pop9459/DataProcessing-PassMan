@@ -61,6 +61,15 @@ namespace PassManAPI.Data
                 .Entity<Vault>()
                 .HasQueryFilter(v => !v.IsDeleted);
 
+            // Propagate the vault soft-delete filter to entities that belong to a vault. Without
+            // this, only Vault queries honor IsDeleted: a soft-deleted vault's credentials and
+            // shares stay queryable, so users the vault was shared with keep full access to its
+            // credentials after the owner "deleted" it. Audit history bypasses these filters via
+            // IgnoreQueryFilters where it deliberately needs deleted vaults.
+            modelBuilder.Entity<Credential>().HasQueryFilter(c => !c.Vault.IsDeleted);
+            modelBuilder.Entity<VaultShare>().HasQueryFilter(vs => !vs.Vault.IsDeleted);
+            modelBuilder.Entity<Invitation>().HasQueryFilter(i => !i.Vault.IsDeleted);
+
             // Credential configurations
             modelBuilder
                 .Entity<Credential>()

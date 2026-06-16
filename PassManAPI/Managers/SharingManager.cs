@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using PassManAPI.Data;
 using PassManAPI.Models;
@@ -12,8 +13,10 @@ public class SharingManager : ISharingManager
     private readonly ApplicationDbContext _db;
     private readonly ILogger<SharingManager> _logger;
 
-    // In-memory store for invitations (in production, use database table)
-    private static readonly Dictionary<Guid, InvitationRecord> _invitations = new();
+    // In-memory store for invitations (in production, use database table). Static and shared
+    // across requests, so it must be concurrency-safe — multiple requests create/accept/remove
+    // invitations on different threads, and a plain Dictionary can corrupt under concurrent writes.
+    private static readonly ConcurrentDictionary<Guid, InvitationRecord> _invitations = new();
 
     private record InvitationRecord(
         Guid Token,
@@ -166,7 +169,7 @@ public class SharingManager : ISharingManager
 
         if (DateTime.UtcNow > invitation.ExpiresAt)
         {
-            _invitations.Remove(token);
+            _invitations.TryRemove(token, out _);
             return SharingResult<VaultShareInfo>.Fail("Invitation has expired.");
         }
 
@@ -190,14 +193,14 @@ public class SharingManager : ISharingManager
 
         if (vault == null)
         {
-            _invitations.Remove(token);
+            _invitations.TryRemove(token, out _);
             return SharingResult<VaultShareInfo>.Fail("Vault no longer exists.");
         }
 
         // Cannot share with the owner
         if (userId == vault.UserId)
         {
-            _invitations.Remove(token);
+            _invitations.TryRemove(token, out _);
             return SharingResult<VaultShareInfo>.Fail("You already own this vault.");
         }
 
@@ -241,7 +244,7 @@ public class SharingManager : ISharingManager
         }
 
         // Only remove the in-memory invitation after the DB transaction has committed successfully.
-        _invitations.Remove(token);
+        _invitations.TryRemove(token, out _);
 
         _logger.LogInformation("Invitation accepted: VaultId={VaultId}, UserId={UserId}", invitation.VaultId, userId);
 

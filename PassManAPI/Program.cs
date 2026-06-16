@@ -218,6 +218,7 @@ public class Program
 
         // Register Security Services
         // Password Encryption Service (AES-256-GCM)
+        builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection(EncryptionOptions.SectionName));
         builder.Services.AddSingleton<IPasswordEncryptionService, PasswordEncryptionService>();
 
         // Two-Factor Authentication Service (TOTP)

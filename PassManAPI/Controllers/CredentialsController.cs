@@ -6,6 +6,7 @@ using PassManAPI.DTOs;
 using PassManAPI.Helpers;
 using PassManAPI.Models;
 using PassManAPI.Services;
+using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
 
 namespace PassManAPI.Controllers;
@@ -16,11 +17,16 @@ public class CredentialsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IPasswordEncryptionService _encryptionService;
+    private readonly string _masterKey;
 
-    public CredentialsController(ApplicationDbContext db, IPasswordEncryptionService encryptionService)
+    public CredentialsController(
+        ApplicationDbContext db,
+        IPasswordEncryptionService encryptionService,
+        IOptions<EncryptionOptions> encryptionOptions)
     {
         _db = db;
         _encryptionService = encryptionService;
+        _masterKey = encryptionOptions.Value.MasterKey;
     }
 
     /// <summary>
@@ -103,29 +109,28 @@ public class CredentialsController : ControllerBase
             return this.UnauthorizedProblem();
         }
 
-        var access = await CheckVaultAccessAsync(vaultId, currentUserId);
+        var access = await CheckVaultModifyAccessAsync(vaultId, currentUserId);
         if (access is not null)
         {
             return access;
         }
 
-        // Generate a per-credential encryption key (32 bytes)
+        // Generate a per-credential key (32 bytes) and encrypt the plaintext password with it.
+        // Note: request.EncryptedPassword contains the plaintext password from the client.
         var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
-        
-        // Encrypt the password using the per-credential key  
-        // Note: request.EncryptedPassword contains the plaintext password from the client
         var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
         var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
-        
-        // Store the per-credential key as Base64 (in production, this should be encrypted with user's master password)
-        // For now, we'll store it alongside the credential (this is a simplified implementation)
-        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
+
+        // Wrap the per-credential key under the server master key so it is never persisted in the
+        // clear. Stored as "{wrappedKey}:{ciphertext}" (both Base64).
+        var wrappedKeyBase64 = Convert.ToBase64String(
+            _encryptionService.EncryptPerCredentialKey(perCredentialKey, _masterKey));
 
         var credential = new Credential
         {
             Title = request.Title.Trim(),
             Username = string.IsNullOrWhiteSpace(request.Username) ? null : request.Username.Trim(),
-            EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}",
+            EncryptedPassword = $"{wrappedKeyBase64}:{encryptedPasswordBase64}",
             Url = string.IsNullOrWhiteSpace(request.Url) ? null : request.Url.Trim(),
             Notes = request.Notes,
             CategoryId = request.CategoryId,
@@ -242,7 +247,8 @@ public class CredentialsController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
-        // Parse the encrypted password (format: "key:encryptedPassword")
+        // Stored as "{wrappedKey}:{ciphertext}" (both Base64). Unwrap the per-credential key with
+        // the server master key, then decrypt the password with it.
         var parts = credential.EncryptedPassword.Split(':', 2);
         if (parts.Length != 2)
         {
@@ -250,13 +256,10 @@ public class CredentialsController : ControllerBase
             return Ok(new PasswordResponse { Password = credential.EncryptedPassword });
         }
 
-        var perCredentialKeyBase64 = parts[0];
-        var encryptedPasswordBase64 = parts[1];
+        var wrappedKeyBytes = Convert.FromBase64String(parts[0]);
+        var encryptedPasswordBytes = Convert.FromBase64String(parts[1]);
 
-        var perCredentialKey = Convert.FromBase64String(perCredentialKeyBase64);
-        var encryptedPasswordBytes = Convert.FromBase64String(encryptedPasswordBase64);
-
-        // Decrypt the password
+        var perCredentialKey = _encryptionService.DecryptPerCredentialKey(wrappedKeyBytes, _masterKey);
         var decryptedPassword = _encryptionService.DecryptPassword(encryptedPasswordBytes, perCredentialKey);
 
         return Ok(new PasswordResponse { Password = decryptedPassword });
@@ -297,8 +300,8 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
@@ -348,21 +351,21 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
 
-        // Generate a new per-credential encryption key
+        // Generate a new per-credential key, encrypt the new password with it, and wrap the key
+        // under the server master key so it is never persisted in the clear.
         var perCredentialKey = _encryptionService.GeneratePerCredentialKey();
-        
-        // Encrypt the new password
         var encryptedPasswordBytes = _encryptionService.EncryptPassword(request.EncryptedPassword, perCredentialKey);
         var encryptedPasswordBase64 = Convert.ToBase64String(encryptedPasswordBytes);
-        var perCredentialKeyBase64 = Convert.ToBase64String(perCredentialKey);
+        var wrappedKeyBase64 = Convert.ToBase64String(
+            _encryptionService.EncryptPerCredentialKey(perCredentialKey, _masterKey));
 
-        credential.EncryptedPassword = $"{perCredentialKeyBase64}:{encryptedPasswordBase64}";
+        credential.EncryptedPassword = $"{wrappedKeyBase64}:{encryptedPasswordBase64}";
         credential.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -396,8 +399,8 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
@@ -492,8 +495,8 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
@@ -565,8 +568,8 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
@@ -623,8 +626,8 @@ public class CredentialsController : ControllerBase
             return this.NotFoundProblem("Credential not found.");
         }
 
-        var canAccess = await CanAccessVault(credential.VaultId, currentUserId);
-        if (!canAccess)
+        var canModify = await CanModifyVault(credential.VaultId, currentUserId);
+        if (!canModify)
         {
             return this.ForbiddenProblem();
         }
@@ -655,6 +658,25 @@ public class CredentialsController : ControllerBase
     }
 
     /// <summary>
+    /// Whether the user may modify the vault's contents. The owner always may; a user the vault is
+    /// shared with may only when their share grants Edit or Admin — a View share is read-only.
+    /// Read access (CanAccessVault) is deliberately broader than modify access.
+    /// </summary>
+    private async Task<bool> CanModifyVault(int vaultId, int currentUserId)
+    {
+        var isOwner = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId && v.UserId == currentUserId);
+        if (isOwner)
+        {
+            return true;
+        }
+
+        return await _db.VaultShares.AsNoTracking()
+            .AnyAsync(vs => vs.VaultId == vaultId
+                            && vs.UserId == currentUserId
+                            && vs.Permission >= SharePermission.Edit);
+    }
+
+    /// <summary>
     /// Returns null when the user may access the vault; otherwise the appropriate error result:
     /// 404 when the vault does not exist, 403 when it exists but is not accessible. Mirrors
     /// VaultsController so a missing vault and an unauthorized one are distinguished consistently.
@@ -662,6 +684,21 @@ public class CredentialsController : ControllerBase
     private async Task<IActionResult?> CheckVaultAccessAsync(int vaultId, int currentUserId)
     {
         if (await CanAccessVault(vaultId, currentUserId))
+        {
+            return null;
+        }
+
+        var vaultExists = await _db.Vaults.AsNoTracking().AnyAsync(v => v.Id == vaultId);
+        return vaultExists ? this.ForbiddenProblem() : this.NotFoundProblem("Vault not found.");
+    }
+
+    /// <summary>
+    /// Like <see cref="CheckVaultAccessAsync"/> but for write operations: returns null only when the
+    /// user may modify the vault. A user with read-only (View) access to a shared vault receives 403.
+    /// </summary>
+    private async Task<IActionResult?> CheckVaultModifyAccessAsync(int vaultId, int currentUserId)
+    {
+        if (await CanModifyVault(vaultId, currentUserId))
         {
             return null;
         }
