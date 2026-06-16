@@ -149,37 +149,23 @@ Permissions are stored as Identity role claims with claim type `permission`. Upd
 ```
 PassManAPI/
 ├── Controllers/       # API endpoints
-│   ├── AuthController.cs
-│   ├── VaultsController.cs
-│   ├── CredentialsController.cs
-│   ├── InvitationsController.cs
-│   ├── TagsController.cs
-│   ├── AuditController.cs
-│   └── ...
-├── Models/           # Domain entities
-│   ├── User.cs
-│   ├── Vault.cs
-│   ├── Credential.cs
-│   ├── SubscriptionTier.cs
-│   ├── Attachment.cs
-│   ├── Invitation.cs
-│   └── ...
-├── Managers/         # Business logic
-├── Data/            # EF Core context and migrations
-├── Services/        # JWT, email, etc.
-└── DTOs/            # Request/response models
+├── Models/            # Domain entities
+├── Managers/          # Business logic layer
+├── Data/              # EF Core context, migrations, seeder, DB artifacts
+├── Services/          # JWT, encryption, TOTP, breach-check
+├── Validators/        # FluentValidation validators
+├── DTOs/              # Request/response models
+└── Middleware/        # Exception handler, auth error body
+
+PassManAPI.Tests/      # xUnit integration tests (123 passing, SQLite in-memory)
 
 PassManGUI/
-├── Components/
-│   ├── Pages/       # Blazor pages
-│   └── Layout/      # Layout components
-└── Services/        # API client services
+├── Components/        # Blazor pages and layout
+└── Services/          # API client services
 
-PassManAPI.Tests/    # xUnit integration tests (121 passing)
-
-scripts/             # Test tooling
-├── PASSMAN-tests.postman_collection.json  # Postman smoke tests (full API surface)
-└── tester/          # Python test harness
+docs/                  # All project documentation
+scripts/               # Postman collection + DB verification SQL
+diagrams/              # Architecture and ER diagrams
 ```
 
 ## 📝 API Endpoints
@@ -221,7 +207,7 @@ scripts/             # Test tooling
 
 ## 🧪 Testing
 
-121 xUnit integration tests (SQLite in-memory) and a Newman collection (full stack, MySQL). Both run in Docker. See **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** for details.
+123 xUnit integration tests (SQLite in-memory) and a Newman collection (full stack, MySQL). Both run in Docker. See **[docs/TESTING.md](docs/TESTING.md)** for details.
 
 ```bash
 # Integration tests
@@ -233,35 +219,31 @@ docker compose --profile e2e up --abort-on-container-exit --scale passman-gui=0
 
 ## 📚 Documentation
 
-- **[API_INTEGRATION_SUMMARY.md](/API_INTEGRATION_SUMMARY.md)** - Frontend-backend integration
-- **[TESTING_GUIDE.md](/TESTING_GUIDE.md)** - Testing strategies and commands
-- **[BACKUP_RECOVERY.md](/BACKUP_RECOVERY.md)** - Database backup procedures
-- **[ProjectSummary.md](/ProjectSummary.md)** - Feature breakdown and roadmap
-- **[GOOGLE_AUTH_DOCS.md](/GOOGLE_AUTH_DOCS.md)** - OAuth setup guide
-- **[docs/DATABASE.md](docs/DATABASE.md)** - Dedicated least-privilege DB account & provisioning
-- **[docs/XML.md](docs/XML.md)** - How to send and receive XML (every endpoint supports JSON and XML)
-- **[docs/VALIDATION.md](docs/VALIDATION.md)** - All input validation rules (DataAnnotations + FluentValidation)
-- **Swagger UI**: http://localhost:5246/swagger
+| File | Covers |
+|------|--------|
+| [docs/TESTING.md](docs/TESTING.md) | Running xUnit + Newman tests, test class breakdown |
+| [docs/BACKUP_RECOVERY.md](docs/BACKUP_RECOVERY.md) | Backup strategy, PITR, recovery playbook, downtime prevention |
+| [docs/VALIDATION.md](docs/VALIDATION.md) | All input validation rules (DataAnnotations + FluentValidation) |
+| [docs/XML.md](docs/XML.md) | JSON + XML content negotiation on every endpoint |
+| [docs/JWT.md](docs/JWT.md) | Token issuance, claims, Swagger auth, configuration |
+| [docs/ROLES.md](docs/ROLES.md) | Roles, permission claims, vault share permission levels |
+| [docs/DATABASE.md](docs/DATABASE.md) | DB account provisioning, least-privilege setup |
+| [docs/TRANSACTIONS.md](docs/TRANSACTIONS.md) | Isolation level choice and justification |
+| [docs/SystemArchitecture.md](docs/SystemArchitecture.md) | Component overview, DB artifacts (view, SPs, triggers) |
+| [diagrams/](diagrams/) | ER diagram, class diagram, architecture diagram |
+| **Swagger UI** | http://localhost:5246/swagger |
 
-## 🎯 Current Features
+## 🎯 Features
 
-### ✅ Implemented
-- User authentication (JWT + Google OAuth)
-- Vault management with CRUD operations
-- Credential storage with encryption
-- Tag-based organization
-- **Subscription tiers** (Free/Premium)
-- **Vault sharing via invitations**
-- **File attachments** for credentials
-- Role-based access control
-- Audit logging
-- Blazor frontend with real-time updates
-
-### 🚧 In Progress
-- Password strength analysis
-- Enhanced search and filtering
-- Password generator
-- Breach monitoring integration
+- JWT + Google OAuth authentication with role-based access control
+- Vault and credential CRUD with AES-256-GCM encryption (per-credential key wrapped under server master key)
+- Vault sharing via invitations with View / Edit / Admin permission levels
+- Tag-based credential organization
+- File attachments per credential
+- Full audit log with pagination and filtering
+- Breach-check integration (HaveIBeenPwned)
+- JSON and XML on every endpoint
+- 123 xUnit integration tests + Newman E2E suite
 
 ## 🛠️ Development
 

@@ -135,7 +135,7 @@ The guarded invariants:
 This page documents the **validation (failure)** path. Success codes for every endpoint —
 `200 OK`, `201 Created`, `204 No Content` — are declared per action with
 `[ProducesResponseType(...)]` and rendered in **Swagger** (`/swagger`), and are asserted end-to-end by
-the Postman/Newman collection (see [TESTING_GUIDE.md](../TESTING_GUIDE.md)).
+the Postman/Newman collection (see [TESTING.md](TESTING.md)).
 
 ## Reconciling FluentValidation vs DataAnnotations
 
