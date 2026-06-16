@@ -1,5 +1,5 @@
 using FluentValidation;
-using static PassManAPI.Controllers.CredentialsController;
+using PassManAPI.DTOs;
 
 namespace PassManAPI.Validators;
 
