@@ -12,7 +12,7 @@ and returned by the auth endpoints in **`PassManAPI/Controllers/AuthController.c
 |---|---|
 | `POST /api/auth/register` | `201` + `{ "accessToken": "<JWT>", "user": { … } }` |
 | `POST /api/auth/login` | `200` + `{ "accessToken": "<JWT>", "user": { … } }` |
-| `POST /api/auth/google` | `200` + `{ "accessToken": "<JWT>", "user": { … } }` (Google OAuth id-token exchange) |
+| `POST /api/auth/google` | `200` + `{ "accessToken": "<JWT>", "user": { … } }` (Google OAuth id-token exchange — **out of scope**: requires an active Google Cloud project) |
 
 > There is **one** token service — `JwtTokenService`. (A second, unused `TokenService`/`AuthManager`
 > stack used to exist and was never wired to any endpoint; it was removed to avoid confusion.)
