@@ -74,7 +74,7 @@
 | **AUTH_CTRL** (Auth) | — | Uses ASP.NET Identity directly (`UserManager<User>`, `SignInManager<User>`) |
 | **USER_CTRL** (Users) | UserManager | |
 | **VAULT_CTRL** (Vaults) | VaultManager | |
-| **CRED_CTRL** (Credentials) | CredentialManager | Also uses VaultManager for access checks |
+| **CRED_CTRL** (Credentials) | — | Accesses ApplicationDbContext directly; uses `IPasswordEncryptionService` for AES-256-GCM (`ICredentialManager` registered in DI but not yet wired) |
 | **SHARE_CTRL** (VaultShares) | — | Accesses ApplicationDbContext directly; uses `sp_AddVaultShare` on MySQL |
 | **INV_CTRL** (Invitations) | — | Accesses ApplicationDbContext directly |
 | **TAG_CTRL** (Tags) | — | Accesses ApplicationDbContext directly |
@@ -164,9 +164,7 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
        │   └─ CredentialsController.CreateCredential()
        │
        ├─→ BUSINESS LOGIC LAYER        [in-process]
-       │   ├─ CredentialManager.CreateAsync()
-       │   ├─ Encrypts password (PasswordEncryptionService / AES-256-GCM)
-       │   └─ Logs action via AuditManager
+       │   └─ Encrypts password (PasswordEncryptionService / AES-256-GCM)
        │
        ├─→ DATA ACCESS LAYER           [in-process]
        │   └─ ApplicationDbContext (Entity Framework Core)
@@ -182,7 +180,7 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
 | Service | Implementation | Protocol | Used By |
 |---------|---------------|----------|---------|
 | **Password Hashing** | BCrypt (`BCryptPasswordHasher`) | in-process | ASP.NET Identity (AuthController) |
-| **Credential Encryption** | AES-256-GCM (`PasswordEncryptionService`) | in-process | CredentialManager |
+| **Credential Encryption** | AES-256-GCM (`PasswordEncryptionService`) | in-process | CredentialsController |
 | **2FA / TOTP** | `TwoFactorService` | in-process | Registered, not yet wired to a controller |
 | **Breach Check** | Have I Been Pwned API (`BreachCheckService`) | HTTPS | Registered, not yet wired to a controller |
 | **Audit Logging** | `AuditManager` + `sp_LogAudit` stored proc | in-process | All managers |

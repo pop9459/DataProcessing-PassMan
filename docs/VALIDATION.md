@@ -149,9 +149,6 @@ both feed `ModelState`, so a field can produce overlapping messages (e.g. DataAn
 - Treat **FluentValidation as the source of truth** for the types that have a validator (it carries the
   richer rules and clearer messages); keep DataAnnotations only for the request types without a
   validator (Tags, Invitations, Sharing, Google login).
-- The credential request types are currently declared **twice** — as nested classes in
-  `CredentialsController` *and* in `DTOs/CredentialDto.cs`. The controller binds its nested versions;
-  the DTO copies are unused. Consolidate to one definition.
 - Password complexity lives in three places (above). They are consistent today; if the policy changes,
   update all three (the attribute, the FV rules, and `IdentityOptions`).
 
