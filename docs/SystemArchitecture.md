@@ -74,9 +74,9 @@
 | **AUTH_CTRL** (Auth) | — | Uses ASP.NET Identity directly (`UserManager<User>`, `SignInManager<User>`) |
 | **USER_CTRL** (Users) | UserManager | |
 | **VAULT_CTRL** (Vaults) | VaultManager | |
-| **CRED_CTRL** (Credentials) | CredentialManager | Also uses VaultManager for access checks |
-| **SHARE_CTRL** (VaultShares) | SharingManager | |
-| **INV_CTRL** (Invitations) | SharingManager | |
+| **CRED_CTRL** (Credentials) | — | Accesses ApplicationDbContext directly; uses `IPasswordEncryptionService` for AES-256-GCM (`ICredentialManager` registered in DI but not yet wired) |
+| **SHARE_CTRL** (VaultShares) | — | Accesses ApplicationDbContext directly; uses `sp_AddVaultShare` on MySQL |
+| **INV_CTRL** (Invitations) | — | Accesses ApplicationDbContext directly |
 | **TAG_CTRL** (Tags) | — | Accesses ApplicationDbContext directly |
 | **AUDIT_CTRL** (Audit) | AuditManager | |
 
@@ -86,23 +86,19 @@
 
 ### **VaultManager**
 - Creates, updates, soft-deletes vaults
-- Enforces subscription tier limits (vault count)
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
 ### **CredentialManager**
 - CRUD for credentials within vaults
 - Encrypts/decrypts passwords (AES-256-GCM)
-- Handles file attachments
 - **Uses**: PasswordEncryptionService
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
 ### **SharingManager**
 - Manages vault share records and invitations
-- Enforces share permissions (read/write)
-- Sends invitation emails
-- **Uses**: Email Service
+- Enforces share permissions (View / Edit / Admin)
 - **Logs to**: Audit Log
 - **Accesses**: ApplicationDbContext
 
@@ -112,7 +108,7 @@
 - **Accesses**: ApplicationDbContext
 
 ### **UserManager**
-- Manages user profiles and subscription tier
+- Manages user profiles (create, update, delete)
 - **Accesses**: ApplicationDbContext
 
 ---
@@ -157,7 +153,7 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
 
 ```
 1. CLIENT
-   └─→ [HTTP] POST /api/credentials  Authorization: Bearer <jwt>
+   └─→ [HTTP] POST /api/vaults/{vaultId}/credentials  Authorization: Bearer <jwt>
        │
        ├─→ SECURITY LAYER              [in-process]
        │   ├─ JWT token validated
@@ -168,10 +164,7 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
        │   └─ CredentialsController.CreateCredential()
        │
        ├─→ BUSINESS LOGIC LAYER        [in-process]
-       │   ├─ CredentialManager.CreateAsync()
-       │   ├─ Encrypts password (PasswordEncryptionService / AES-256-GCM)
-       │   ├─ Handles attachment if present
-       │   └─ Logs action via AuditManager
+       │   └─ Encrypts password (PasswordEncryptionService / AES-256-GCM)
        │
        ├─→ DATA ACCESS LAYER           [in-process]
        │   └─ ApplicationDbContext (Entity Framework Core)
@@ -187,10 +180,9 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
 | Service | Implementation | Protocol | Used By |
 |---------|---------------|----------|---------|
 | **Password Hashing** | BCrypt (`BCryptPasswordHasher`) | in-process | ASP.NET Identity (AuthController) |
-| **Credential Encryption** | AES-256-GCM (`PasswordEncryptionService`) | in-process | CredentialManager |
-| **2FA / TOTP** | `TwoFactorService` | in-process | AuthController |
-| **Breach Check** | Have I Been Pwned API (`BreachCheckService`) | HTTPS | AuthController |
-| **Email** | `EmailService` | SMTP | SharingManager |
+| **Credential Encryption** | AES-256-GCM (`PasswordEncryptionService`) | in-process | CredentialsController |
+| **2FA / TOTP** | `TwoFactorService` | in-process | Registered, not yet wired to a controller |
+| **Breach Check** | Have I Been Pwned API (`BreachCheckService`) | HTTPS | Registered, not yet wired to a controller |
 | **Audit Logging** | `AuditManager` + `sp_LogAudit` stored proc | in-process | All managers |
 
 ---
@@ -232,7 +224,6 @@ Authentication uses JWT Bearer tokens. After login, the client includes the toke
 - **AES-256-GCM** — authenticated encryption for stored credentials
 - **Authorization policies** — fine-grained permission claims per role
 - **Audit logging** — all security-relevant actions tracked via `sp_LogAudit`
-- **2FA / TOTP** — multi-factor authentication
 - **Soft deletes** — vault data retained after deletion
 - **CORS** — restricted to known frontend origins
 - **Least-privilege DB account** — API uses `passman_app` (not root)

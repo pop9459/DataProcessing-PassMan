@@ -22,7 +22,7 @@ Starts MySQL and the API, waits for the API healthcheck, runs the full collectio
 
 ## Integration test classes
 
-121 tests across 15 classes. Auth uses a dev-header scheme (`X-UserId`) instead of JWT; DB is SQLite in-memory seeded with roles and demo users on startup.
+123 tests across 15 classes. Auth uses a dev-header scheme (`X-UserId`) instead of JWT; DB is SQLite in-memory seeded with roles and demo users on startup.
 
 | Class | What it covers |
 |---|---|
@@ -34,7 +34,7 @@ Starts MySQL and the API, waits for the API healthcheck, runs the full collectio
 | UserEndpointsTests | User profile/vaults/tags CRUD; cross-user access blocked (403) |
 | VaultEndpointsTests | Vault CRUD; shared user can read but not mutate (403) |
 | VaultSharesEndpointsTests | Share/revoke access control; `GetMyVaultAccess` ownership types |
-| CredentialsEndpointsTests | Credential CRUD; VaultReader blocked from creating (403) |
+| CredentialsEndpointsTests | Credential CRUD; View-share blocked from mutations (403); soft-deleted vault hides credentials |
 | TagsEndpointsTests | Tag CRUD; duplicate/cross-user name handling (regression #163) |
 | AuditEndpointsTests | Log listing with pagination/filters; vault logs; admin all-logs |
 | XmlSerializationTests | All endpoints accept XML bodies and return XML via `Accept` header |

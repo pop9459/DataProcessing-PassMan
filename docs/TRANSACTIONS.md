@@ -8,7 +8,11 @@ PassMan uses **explicit EF Core transactions** for any operation that involves m
 
 ## Full Transaction Example — Accepting a Vault Invitation
 
-The most important multi-step operation in the app is accepting a vault share invitation. It:
+The cleanest example of an explicit transaction in the codebase is `SharingManager.AcceptInvitationAsync` — it wraps vault-share creation in an explicit transaction so that the in-memory invitation is only consumed **after** the DB commit succeeds.
+
+> **Note:** `SharingManager` is registered in the DI container but is not currently wired to a controller endpoint. The HTTP invitation-acceptance endpoint (`POST /api/invitations/{token}/accept`) is in `InvitationsController`, which uses EF's implicit single-`SaveChangesAsync` transaction. The `SharingManager` pattern is documented here as the intended transactional design.
+
+The operation:
 
 1. Reads the invitation from in-memory store
 2. **Writes** a new `VaultShare` row (or updates an existing one) — this is the critical step
@@ -59,7 +63,7 @@ catch (Exception ex)
 }
 
 // Step 4 — only consume the in-memory invitation AFTER the commit succeeds
-_invitations.Remove(token);
+_invitations.TryRemove(token, out _);
 ```
 
 ### Why the order matters

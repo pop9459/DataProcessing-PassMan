@@ -69,9 +69,6 @@ PascalCase property names.
 
 ## Errors in XML
 
-> Error-body content negotiation (4xx/5xx in XML) is delivered by the error-handling change in
-> **#178** (PR #183). The examples below describe the behaviour once that is merged to `develop`.
-
 Error bodies content-negotiate the same way — request `Accept: application/xml` and a 4xx/5xx comes
 back as XML instead of JSON:
 
